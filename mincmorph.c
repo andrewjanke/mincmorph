@@ -48,9 +48,9 @@ void     print_version_info(void);
 /* typedefs */
 typedef enum {
    UNDEF = 0,
-   BINARISE, CLAMP, PAD, ERODE, DILATE,
-   OPEN, CLOSE, LPASS, HPASS, CONVOLVE,
-   DISTANCE, GROUP, READ_KERNEL, WRITE
+   BINARISE, CLAMP, PAD, ERODE, DILATE, MDILATE,
+   OPEN, CLOSE, LPASS, HPASS, CONVOLVE, DISTANCE, 
+   GROUP, READ_KERNEL, WRITE
    } op_types;
 
 typedef struct {
@@ -79,6 +79,7 @@ char     successive_help[] = "Successive operations (Maximum: 100) \
 \n\tP[bg] - pad volume with respect to the current kernel using 'bg' (default: 0)\
 \n\tE - erosion \
 \n\tD - dilation \
+\n\tM - median dilation \
 \n\tO - open \
 \n\tC - close \
 \n\tL - lowpass filter \
@@ -141,6 +142,8 @@ ArgvInfo argTable[] = {
     "do a single erosion"},
    {"-dilation", ARGV_CONSTANT, (char *)"D", (char *)&succ_txt,
     "do a single dilation"},
+   {"-median_dilation", ARGV_CONSTANT, (char *)"M", (char *)&succ_txt,
+    "do a single median dilation (note: this is not a median filter!)"},
    {"-open", ARGV_CONSTANT, (char *)"O", (char *)&succ_txt,
     "open:            dilation(erosion(X))"},
    {"-close", ARGV_CONSTANT, (char *)"C", (char *)&succ_txt,
@@ -299,6 +302,10 @@ int main(int argc, char *argv[])
          op->type = DILATE;
          break;
 
+      case 'M':
+         op->type = MDILATE;
+         break;
+
       case 'O':
          op->type = OPEN;
          break;
@@ -428,6 +435,10 @@ int main(int argc, char *argv[])
 
       case DILATE:
          volume = dilation_kernel(kern, volume);
+         break;
+
+      case MDILATE:
+         volume = median_dilation_kernel(kern, volume);
          break;
 
       case OPEN:

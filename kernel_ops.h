@@ -11,8 +11,9 @@
 Volume  *binarise(Volume * vol, double floor, double ceil, double fg, double bg);
 Volume  *clamp(Volume * vol, double floor, double ceil, double bg);
 Volume  *pad(Kernel * K, Volume * vol, double bg);
-Volume  *dilation_kernel(Kernel * K, Volume * vol);
 Volume  *erosion_kernel(Kernel * K, Volume * vol);
+Volume  *dilation_kernel(Kernel * K, Volume * vol);
+Volume  *median_dilation_kernel(Kernel * K, Volume * vol);
 Volume  *convolve_kernel(Kernel * K, Volume * vol);
 Volume  *distance_kernel(Kernel * K, Volume * vol, double bg);
 Volume  *group_kernel(Kernel * K, Volume * vol, double bg);
