@@ -20,6 +20,10 @@
 /*                                                                           */
 /* Fri Jan 18 11:41:08 EST 2002 - initial version from mincgroup             */
 /* Mon Jan 28 11:41:37 EST 2002 - first version that works                   */
+/* Mon Nov 25 16:32:54 EST 2002 - rewrote most of the successive text parser */
+/*                              - simplified Group option for flexibility    */
+/*                              - replaced K (Keep) option with Clamp.       */
+/*                              - introduced notion of fore and back colors  */
 
 
 #include <stdlib.h>
@@ -32,47 +36,53 @@
 #include "kernel_io.h"
 #include "kernel_ops.h"
 
+#define DEF_DOUBLE -1
+
+/* function prototypes */
+char    *get_real_from_string(char *string, double *value);
+char    *get_string_from_string(char *string, char **value);
+
 /* typedefs */
 typedef enum {
    UNDEF = 0,
-   BINARISE, GROUP, CONVOLVE, ERODE, DILATE,
-   OPEN, CLOSE, LPASS, HPASS, PAD, KEEP,
-   DISTANCE, READ_KERNEL, WRITE
+   BINARISE, CLAMP, PAD, ERODE, DILATE,
+   OPEN, CLOSE, LPASS, HPASS, CONVOLVE,
+   DISTANCE, GROUP, READ_KERNEL, WRITE
 } op_types;
 
 typedef struct {
    op_types type;
+   char     op_c;
    Kernel  *kern;
    char    *outfile;
-   double   binarise_range[2];
-   double   group_range[2];
-   int      max_groups;
-   int      num_groups;
-   double   pad_value;
+   double   range[2];
+   double   foreground;
+   double   background;
 } Operation;
 
 /* Argument variables */
 int      verbose = FALSE;
 int      clobber = FALSE;
-double   vol_range[2] = { -DBL_MAX, DBL_MAX };
-double   group_range[2] = { 0.0, DBL_MAX };
+nc_type  dtype = NC_SHORT;
+double   range[2] = { -DBL_MAX, DBL_MAX };
+double   foreground = 1.0;
+double   background = 0.0;
 char    *kernel_fn = NULL;
-int      max_groups = 250;
 char    *succ_txt = "B";
 
 char     successive_help[] = "Successive operations (Maximum: 100) \
-\n\tB[floor:ceil] - binarise \
-\n\tG[gfloor:gceil:max_groups] - group \
-\n\tX - convolve \
+\n\tB[floor:ceil:fg:bg] - binarise in the range, using foreground and background \
+\n\tK[floor:ceil:bg] - clamp betwen the specified range. Set other voxels to 'bg' (default: 0) \
+\n\tP[bg] - pad volume with respect to the current kernel using 'bg' (default: 0)\
 \n\tE - erosion \
 \n\tD - dilation \
 \n\tO - open \
 \n\tC - close \
 \n\tL - lowpass filter \
 \n\tH - highpass filter \
-\n\tP[n] - pad volume with respect to current kernel using n as the fill-value (default: 0)\
-\n\tK[n] - keep the largest n objects (default: 1) \
+\n\tX - convolve \
 \n\tF - distance transform (binary input only - not checked) \
+\n\tG - Label the groups in the volume in ascending order \
 \n\tR[file.kern] - read in a kernel file \
 \n\tW[file.mnc]  - write out current results \
 \n\tDefault: ";
@@ -83,37 +93,44 @@ ArgvInfo argTable[] = {
     "be verbose"},
    {"-clobber", ARGV_CONSTANT, (char *)TRUE, (char *)&clobber,
     "clobber existing files"},
+
+   {NULL, ARGV_HELP, NULL, NULL, "\nOutfile Options (NB: this will affect internal precision)"},
+   {"-byte", ARGV_CONSTANT, (char *)NC_BYTE, (char *)&dtype,
+    "Write out byte data."},
+   {"-short", ARGV_CONSTANT, (char *)NC_SHORT, (char *)&dtype,
+    "Write out short integer data. (Default)"},
+   {"-int", ARGV_CONSTANT, (char *)NC_INT, (char *)&dtype,
+    "Write out long integer data."},
+   {"-float", ARGV_CONSTANT, (char *)NC_FLOAT, (char *)&dtype,
+    "Write out single-precision data."},
+   {"-double", ARGV_CONSTANT, (char *)NC_DOUBLE, (char *)&dtype,
+    "Write out double-precision data."},
+   
+   {NULL, ARGV_HELP, NULL, NULL, "\nMorphology Options"},
    {"-kernel", ARGV_STRING, (char *)1, (char *)&kernel_fn,
     "<kernel.kern> read in a kernel file"},
-   {"-floor", ARGV_FLOAT, (char *)1, (char *)&vol_range[0],
-    "ignore voxels below this value"},
-   {"-ceil", ARGV_FLOAT, (char *)1, (char *)&vol_range[1],
-    "ignore voxels above this value (incl)"},
-   {"-range", ARGV_FLOAT, (char *)2, (char *)vol_range,
-    "ignore voxels outside the range (incl)"},
-
-   {NULL, ARGV_HELP, (char *)NULL, (char *)NULL, "\nGroup size options:"},
-   {"-group_floor", ARGV_FLOAT, (char *)1, (char *)&group_range[0],
-    "ignore groups below this size"},
-   {"-group_ceil", ARGV_FLOAT, (char *)1, (char *)&group_range[1],
-    "ignore groups above this size  (incl)"},
-   {"-group_range", ARGV_FLOAT, (char *)2, (char *)group_range,
-    "ignore groups outside the range (incl)"},
-
-   {"-max_groups", ARGV_INT, (char *)1, (char *)&max_groups,
-    "the maximum number of groups to segment"},
+   {"-floor", ARGV_FLOAT, (char *)1, (char *)&range[0],
+    "lowwer value for binarising or clamping"},
+   {"-ceil", ARGV_FLOAT, (char *)1, (char *)&range[1],
+    "upper value for binarising or clamping (incl)"},
+   {"-range", ARGV_FLOAT, (char *)2, (char *)range,
+    "range for binarising or clamping (incl)"},
+   {"-foreground", ARGV_FLOAT, (char *)1, (char *)&foreground,
+    "foreground value"},
+   {"-background", ARGV_FLOAT, (char *)1, (char *)&background,
+    "background value"},
 
    {NULL, ARGV_HELP, (char *)NULL, (char *)NULL, "\nSingle morphological operations:"},
    {"-binarise", ARGV_CONSTANT, (char *)"B", (char *)&succ_txt,
-    "binarise volume (use -range for range)"},
-   {"-group", ARGV_CONSTANT, (char *)"G", (char *)&succ_txt,
-    "find groups (use -group_range for size)"},
-   {"-convolve", ARGV_CONSTANT, (char *)"X", (char *)&succ_txt,
-    "convolve file with kernel"},
+    "binarise volume using the input range"},
+   {"-clamp", ARGV_CONSTANT, (char *)"K", (char *)&succ_txt,
+    "clamp volume using the input range"},
+   {"-pad", ARGV_CONSTANT, (char *)"P", (char *)&succ_txt,
+    "pad volume with respect to the current kernel (-background to specify value)"},
    {"-erosion", ARGV_CONSTANT, (char *)"E", (char *)&succ_txt,
-    "erosion"},
+    "do a single erosion"},
    {"-dilation", ARGV_CONSTANT, (char *)"D", (char *)&succ_txt,
-    "dilation"},
+    "do a single dilation"},
    {"-open", ARGV_CONSTANT, (char *)"O", (char *)&succ_txt,
     "open:            dilation(erosion(X))"},
    {"-close", ARGV_CONSTANT, (char *)"C", (char *)&succ_txt,
@@ -122,24 +139,16 @@ ArgvInfo argTable[] = {
     "lowpass filter:  close(open(X))"},
    {"-highpass", ARGV_CONSTANT, (char *)"H", (char *)&succ_txt,
     "highpass filter: X - lowpass(X)"},
-   {"-pad", ARGV_CONSTANT, (char *)"P", (char *)&succ_txt,
-    "pad volume with respect to current kernel"},
-   {"-keep", ARGV_CONSTANT, (char *)"K", (char *)&succ_txt,
-    "keep the largest cluster"},
+   {"-convolve", ARGV_CONSTANT, (char *)"X", (char *)&succ_txt,
+    "convolve file with kernel"},
    {"-distance", ARGV_CONSTANT, (char *)"F", (char *)&succ_txt,
-    "distance transform (implicit pad before)"},
+    "distance transform"},
+   {"-group", ARGV_CONSTANT, (char *)"G", (char *)&succ_txt,
+    "label groups in ascending order"},
 
-   {NULL, ARGV_HELP, (char *)NULL, (char *)NULL, "\nSuccessive morphological operations:"},
+   {NULL, ARGV_HELP, (char *)NULL, (char *)NULL,
+    "\nSuccessive morphological operations:"},
    {"-successive", ARGV_STRING, (char *)1, (char *)&succ_txt, successive_help},
-
-   {NULL, ARGV_HELP, (char *)NULL, (char *)NULL, "\nXXXXXXX DON'T USE THESE! XXXXXXX"},
-   {NULL, ARGV_HELP, (char *)NULL, (char *)NULL, "XXX compatibility with binop XXX"},
-   {"-objlimit", ARGV_INT, (char *)1, (char *)&max_groups,
-    "maps to -max_groups"},
-   {"-thres", ARGV_FLOAT, (char *)2, (char *)vol_range,
-    "maps to -range"},
-   {"-obinary", ARGV_CONSTANT, (char *)"B", (char *)&succ_txt,
-    "maps to -binarise"},
 
    {NULL, ARGV_HELP, NULL, NULL, ""},
    {NULL, ARGV_END, NULL, NULL, NULL}
@@ -147,7 +156,7 @@ ArgvInfo argTable[] = {
 
 int main(int argc, char *argv[])
 {
-   int      offset, op_c, c, num_matched;
+   int      c;
    char    *arg_string;
    char    *infile;
    char    *outfile;
@@ -156,9 +165,12 @@ int main(int argc, char *argv[])
    Kernel  *kern;
    int      num_ops;
    Operation operation[100];
-   char     tmp_str[256];
+   Operation *op;
+   char    *tmp_str;
    char     ext_txt[256];
    char     tmp_filename[MAXPATHLEN];
+   double   tmp_double[4];
+   char    *ptr;
 
    char    *axis_order[3] = { MIzspace, MIyspace, MIxspace };
 
@@ -198,7 +210,8 @@ int main(int argc, char *argv[])
          }
 
       if(input_kernel(kernel_fn, kern) != OK){
-         fprintf(stderr, "%s: Died whilst reading in kernel file: %s\n", argv[0], kernel_fn);
+         fprintf(stderr, "%s: Died whilst reading in kernel file: %s\n", argv[0],
+                 kernel_fn);
          exit(EXIT_FAILURE);
          }
       if(verbose){
@@ -209,310 +222,162 @@ int main(int argc, char *argv[])
    setup_pad_values(kern);
 
    /* setup operations and check them... */
-   num_ops = strlen(succ_txt);
-   op_c = 0;
    if(verbose){
       fprintf(stdout, "---Checking Operation(s): %s---\n", succ_txt);
       }
-   for(c = 0; c < num_ops; c++){
+
+   num_ops = 0;
+   ptr = succ_txt;
+   while (ptr[0] != '\0'){
 
       /* set up counters and extra text */
-      offset = 0;
       strcpy(ext_txt, "");
+      op = &operation[num_ops++];
 
-      switch (succ_txt[c]){
+      /* get the operation type */
+      op->op_c = ptr[0];
+      ptr++;
+
+      switch (op->op_c){
       case 'B':
-         operation[op_c].type = BINARISE;
+         op->type = BINARISE;
 
-         /* look for a range else use the default C/L ones */
-         if(succ_txt[c + 1] == '['){
-            while (succ_txt[c + offset] != ']'){
-
-               /* check that we aren't off the edge of the world */
-               if(succ_txt[c + offset] == '\0'){
-                  fprintf(stderr,
-                          "%s: I think you missed the closing ']' on the B[floor:ceil] ? : %s\n",
-                          argv[0], tmp_str);
-                  exit(EXIT_FAILURE);
-                  }
-
-               sscanf(&succ_txt[c + offset], "%1s", &tmp_str[offset]);
-               offset++;
-               }
-
-            if(strlen(&tmp_str[2]) == 0){
-               fprintf(stderr, "%s: missing numbers in the B[floor:ceil] argument\n", argv[0]);
-               exit(EXIT_FAILURE);
-               }
-
-            sscanf(&tmp_str[2], "%lf:%lf", &operation[op_c].binarise_range[0],
-                   &operation[op_c].binarise_range[1]);
-
-            /* figger out the offset to the next operator */
-            while (succ_txt[c + offset] != ']'){
-               offset++;
-               }
-            }
-         else{
-            operation[op_c].binarise_range[0] = vol_range[0];
-            operation[op_c].binarise_range[1] = vol_range[1];
-            }
-
-         sprintf(ext_txt, "range: [%g:%g]", operation[op_c].binarise_range[0],
-                 operation[op_c].binarise_range[1]);
-         break;
-
-      case 'G':
-         operation[op_c].type = GROUP;
-
-         /* look for a range else use the default C/L ones */
-         if(succ_txt[c + 1] == '['){
-            while (succ_txt[c + offset] != ']'){
-
-               /* check that we aren't off the edge of the world */
-               if(succ_txt[c + offset] == '\0'){
-                  fprintf(stderr,
-                          "%s: I think you missed the closing ']' on the G[gfloor:gceil:max_groups] ? : %s\n",
-                          argv[0], tmp_str);
-                  exit(EXIT_FAILURE);
-                  }
-
-               sscanf(&succ_txt[c + offset], "%1s", &tmp_str[offset]);
-               offset++;
-               }
-
-            if(strlen(&tmp_str[2]) == 0){
-               fprintf(stderr, "%s: missing numbers in the G[gfloor:gceil:max_groups] argument\n",
-                       argv[0]);
-               exit(EXIT_FAILURE);
-               }
-
-
-            num_matched = sscanf(&tmp_str[2], "%lf:%lf:%d", &operation[op_c].group_range[0],
-                                 &operation[op_c].group_range[1], &operation[op_c].max_groups);
-
-            if(operation[op_c].max_groups > 250){
-               fprintf(stderr, "%s: Input number of groups (%d) exceeds 250\n",
-                       argv[0], operation[op_c].max_groups);
-               exit(EXIT_FAILURE);
-               }
-
-            /* check for a missing number of groups */
-            if(num_matched == 2){
-               operation[op_c].max_groups = max_groups;
-               }
-
-            }
-         else{
-            operation[op_c].group_range[0] = group_range[0];
-            operation[op_c].group_range[1] = group_range[1];
-            operation[op_c].max_groups = max_groups;
-            }
-
-         sprintf(ext_txt, "group range: [%g:%g]  max # groups: %d",
-                 operation[op_c].group_range[0], operation[op_c].group_range[1],
-                 operation[op_c].max_groups);
-         break;
-
-      case 'X':
-         operation[op_c].type = CONVOLVE;
-         break;
-
-      case 'E':
-         operation[op_c].type = ERODE;
-         break;
-
-      case 'D':
-         operation[op_c].type = DILATE;
-         break;
-
-      case 'O':
-         operation[op_c].type = OPEN;
-         break;
-
-      case 'C':
-         operation[op_c].type = CLOSE;
-         break;
-
-      case 'L':
-         operation[op_c].type = LPASS;
-         break;
-
-      case 'H':
-         operation[op_c].type = HPASS;
-         break;
-
-      case 'P':
-         operation[op_c].type = PAD;
-
-         /* look for a range else use the default C/L ones */
-         if(succ_txt[c + 1] == '['){
-            while (succ_txt[c + offset] != ']'){
-
-               /* check that we aren't off the edge of the world */
-               if(succ_txt[c + offset] == '\0'){
-                  fprintf(stderr, "%s: I think you missed the closing ']' on the P[n] ? : %s\n",
-                          argv[0], tmp_str);
-                  exit(EXIT_FAILURE);
-                  }
-
-               sscanf(&succ_txt[c + offset], "%1s", &tmp_str[offset]);
-               offset++;
-               }
-
-            if(strlen(&tmp_str[2]) == 0){
-               fprintf(stderr, "%s: missing number in P[n] argument\n", argv[0]);
-               exit(EXIT_FAILURE);
-               }
-
-            sscanf(&tmp_str[2], "%lf", &operation[op_c].pad_value);
-
-            /* figger out the offset to the next operator */
-            while (succ_txt[c + offset] != ']'){
-               offset++;
-               }
-            }
-         else{
-            operation[op_c].pad_value = 0;
-            }
-
-         sprintf(ext_txt, "fill value: %g", operation[op_c].pad_value);
+         /* get 4 possible values */
+         ptr = get_real_from_string(ptr, &tmp_double[0]);
+         ptr = get_real_from_string(ptr, &tmp_double[1]);
+         ptr = get_real_from_string(ptr, &tmp_double[2]);
+         ptr = get_real_from_string(ptr, &tmp_double[3]);
+         op->range[0] = (tmp_double[0] == DEF_DOUBLE) ? range[0] : tmp_double[0];
+         op->range[1] = (tmp_double[1] == DEF_DOUBLE) ? range[1] : tmp_double[1];
+         op->foreground = (tmp_double[2] == DEF_DOUBLE) ? foreground : tmp_double[2];
+         op->background = (tmp_double[3] == DEF_DOUBLE) ? background : tmp_double[3];
+         
+         sprintf(ext_txt, "range: [%g:%g] fg/bg: [%g:%g]", op->range[0],
+                 op->range[1], op->foreground, op->background);
          break;
 
       case 'K':
-         operation[op_c].type = KEEP;
+         op->type = CLAMP;
 
-         /* look for a range else use the default C/L ones */
-         if(succ_txt[c + 1] == '['){
+         /* get 3 possible values */
+         ptr = get_real_from_string(ptr, &tmp_double[0]);
+         ptr = get_real_from_string(ptr, &tmp_double[1]);
+         ptr = get_real_from_string(ptr, &tmp_double[2]);
+         op->range[0] = (tmp_double[0] == DEF_DOUBLE) ? range[0] : tmp_double[0];
+         op->range[1] = (tmp_double[1] == DEF_DOUBLE) ? range[1] : tmp_double[1];
+         op->background = (tmp_double[2] == DEF_DOUBLE) ? background : tmp_double[2];
 
-            /* find the end of the string */
-            while (succ_txt[c + offset] != ']'){
+         sprintf(ext_txt, "range: [%g:%g] fg/bg: [%g:%g]", op->range[0],
+                 op->range[1], op->foreground, op->background);
+         break;
 
-               /* check that we aren't off the edge of the world */
-               if(succ_txt[c + offset] == '\0'){
-                  fprintf(stderr, "%s: I think you missed the closing ']' on the K[n] ? : %s\n",
-                          argv[0], tmp_str);
-                  exit(EXIT_FAILURE);
-                  }
+      case 'P':
+         op->type = PAD;
 
-               sscanf(&succ_txt[c + offset], "%1s", &tmp_str[offset]);
-               offset++;
-               }
+         /* get 1 possible value */
+         ptr = get_real_from_string(ptr, &tmp_double[0]);
+         op->background = (tmp_double[0] == DEF_DOUBLE) ? background : tmp_double[0];
 
-            if(strlen(&tmp_str[2]) == 0){
-               fprintf(stderr, "%s: missing number in K[n] argument\n", argv[0]);
-               exit(EXIT_FAILURE);
-               }
+         sprintf(ext_txt, "fill value: %g", op->background);
+         break;
 
-            sscanf(&tmp_str[2], "%d", &operation[op_c].num_groups);
-            }
-         else{
-            operation[op_c].num_groups = 1;
-            }
+      case 'E':
+         op->type = ERODE;
+         break;
 
-         sprintf(ext_txt, "keep %d largest group(s)", operation[op_c].num_groups);
+      case 'D':
+         op->type = DILATE;
+         break;
+
+      case 'O':
+         op->type = OPEN;
+         break;
+
+      case 'C':
+         op->type = CLOSE;
+         break;
+
+      case 'L':
+         op->type = LPASS;
+         break;
+
+      case 'H':
+         op->type = HPASS;
+         break;
+
+      case 'X':
+         op->type = CONVOLVE;
          break;
 
       case 'F':
-         operation[op_c].type = DISTANCE;
+         op->type = DISTANCE;
+         break;
+
+      case 'G':
+         op->type = GROUP;
          break;
 
       case 'R':
-         operation[op_c].type = READ_KERNEL;
+         op->type = READ_KERNEL;
 
          /* get the filename */
-         if(succ_txt[c + 1] == '['){
+         ptr = get_string_from_string(ptr, &tmp_str);
 
-            /* find the end of the string */
-            while (succ_txt[c + offset] != ']'){
-               if(succ_txt[c + offset] == '\0'){
-                  fprintf(stderr,
-                          "%s: I think you missed the closing ']' on the R[file.kern] ? : %s\n",
-                          argv[0], tmp_str);
-                  exit(EXIT_FAILURE);
-                  }
-
-               sscanf(&succ_txt[c + offset], "%1s", &tmp_str[offset]);
-               offset++;
-               }
-
-            operation[op_c].kern = new_kernel(0);
-
-            /* set up the real filename */
-            realpath(&tmp_str[2], tmp_filename);
-
-            fprintf(stderr, "\nXXXX\nKernel File: %s\nXXXX\n\n", tmp_filename);
-            if(access(tmp_filename, F_OK) != 0){
-               fprintf(stderr, "%s: Couldn't find kernel file: %s\n", argv[0], tmp_filename);
-               exit(EXIT_FAILURE);
-               }
-
-            if(input_kernel(&tmp_str[2], operation[op_c].kern) != OK){
-               fprintf(stderr, "%s: Died whilst reading in kernel file: %s\n", argv[0],
-                       &tmp_str[2]);
-               exit(EXIT_FAILURE);
-               }
-            }
-         else{
-            fprintf(stderr, "%s: R[file.kern] _requires_ a kernel filename\n", argv[0]);
+         if(tmp_str == NULL){
+            fprintf(stderr, "%s: R[file.kern] _requires_ a filename\n", argv[0]);
             exit(EXIT_FAILURE);
             }
 
-         sprintf(ext_txt, "kernel: %s", &tmp_str[2]);
+         op->kern = new_kernel(0);
+
+         /* set up the real filename */
+         realpath(tmp_str, tmp_filename);
+         
+         if(access(tmp_filename, F_OK) != 0){
+            fprintf(stderr, "%s: Couldn't find kernel file: %s\n", argv[0], tmp_filename);
+            exit(EXIT_FAILURE);
+            }
+
+         if(input_kernel(tmp_str, op->kern) != OK){
+            fprintf(stderr, "%s: Died whilst reading in kernel file: %s\n", argv[0],
+                    tmp_str);
+            exit(EXIT_FAILURE);
+            }
+
+         sprintf(ext_txt, "kernel: %s", tmp_str);
          break;
 
       case 'W':
-         operation[op_c].type = WRITE;
+         op->type = WRITE;
 
          /* get the filename */
-         if(succ_txt[c + 1] == '['){
-            while (succ_txt[c + offset] != ']'){
+         ptr = get_string_from_string(ptr, &op->outfile);
 
-               /* check that we aren't off the edge of the world */
-               if(succ_txt[c + offset] == '\0'){
-                  fprintf(stderr,
-                          "%s: I think you missed the closing ']' on the W[file.mnc] ? : %s\n",
-                          argv[0], tmp_str);
-                  exit(EXIT_FAILURE);
-                  }
-
-               sscanf(&succ_txt[c + offset], "%1s", &tmp_str[offset]);
-               offset++;
-               }
-
-            operation[op_c].outfile = (char *)malloc((offset - 2) * sizeof(char));
-            strcpy(operation[op_c].outfile, &tmp_str[2]);
-
-            if(access(operation[op_c].outfile, F_OK) != -1 && !clobber){
-               fprintf(stderr, "%s: %s exists! (use -clobber to overwrite)\n", argv[0],
-                       operation[op_c].outfile);
-               exit(EXIT_FAILURE);
-               }
-
-            }
-         else{
+         if(op->outfile == NULL){
             fprintf(stderr, "%s: W[file.mnc] _requires_ a filename\n", argv[0]);
             exit(EXIT_FAILURE);
             }
 
-         sprintf(ext_txt, "filename: %s", operation[op_c].outfile);
+         /* check for the outfile */
+         if(access(op->outfile, F_OK) != -1 && !clobber){
+            fprintf(stderr, "%s: %s exists! (use -clobber to overwrite)\n", argv[0], op->outfile);
+            exit(EXIT_FAILURE);
+            }
+
+         sprintf(ext_txt, "filename: %s", op->outfile);
          break;
 
       default:
-         fprintf(stderr, "\nUnknown op: %c\n\n  %s -help  for operations\n\n", succ_txt[c],
-                 argv[0]);
+         fprintf(stderr, "\nUnknown op: %c\n\n  %s -help  for operations\n\n",
+                 op->op_c, argv[0]);
          exit(EXIT_FAILURE);
          }
 
       if(verbose){
-         fprintf(stdout, "  [%02d+%02d] Op[%02d] %c = %d\t\t%s\n", c, offset, op_c,
-                 succ_txt[c], operation[op_c].type, ext_txt);
+         fprintf(stdout, "  Op[%02d] %c = %d\t\t%s\n", num_ops, op->op_c, op->type,
+                 ext_txt);
          }
-
-      op_c++;
-      c += offset;
       }
-   num_ops = op_c;
 
    /* add an implicit write statment to the end if needed */
    if(operation[num_ops - 1].type != WRITE){
@@ -523,27 +388,28 @@ int main(int argc, char *argv[])
 
    /* malloc space for volume structure and read in infile */
    volume = (Volume *) malloc(sizeof(Volume));
-   input_volume(infile, MAX_VAR_DIMS, axis_order, NC_UNSPECIFIED, TRUE, 0.0, 0.0, TRUE, volume,
-                NULL);
+   input_volume(infile, MAX_VAR_DIMS, axis_order, NC_UNSPECIFIED, TRUE, 0.0, 0.0, TRUE,
+                volume, NULL);
 
-   /* do some operations.... */
+   /* do some operations */
    if(verbose){
       fprintf(stdout, "\n---Doing %d Operation(s)---\n", num_ops);
       }
    for(c = 0; c < num_ops; c++){
-      switch (operation[c].type){
+      op = &operation[c];
+
+      switch (op->type){
       case BINARISE:
-         volume = binarise(volume, operation[c].binarise_range[0], operation[c].binarise_range[1]);
+         volume =
+            binarise(volume, dtype, op->range[0], op->range[1], op->foreground, op->background);
          break;
 
-      case GROUP:
-         volume = group_kernel(kern, volume, outfile,
-                               operation[c].group_range[0], operation[c].group_range[1],
-                               operation[c].max_groups);
+      case CLAMP:
+         volume = clamp(volume, op->range[0], op->range[1], op->background);
          break;
 
-      case CONVOLVE:
-         volume = convolve_kernel(kern, volume);
+      case PAD:
+         volume = pad(kern, volume, op->background);
          break;
 
       case ERODE:
@@ -575,36 +441,35 @@ int main(int argc, char *argv[])
          fprintf(stderr, "GNFARK! Highpass Not implemented yet..\n");
          break;
 
-      case PAD:
-         volume = pad_volume(kern, volume, operation[c].pad_value);
-         break;
-
-      case KEEP:
-         fprintf(stderr, "GNFARK! Keep not implemented yet..\n");
+      case CONVOLVE:
+         volume = convolve_kernel(kern, volume);
          break;
 
       case DISTANCE:
-         volume = distance_kernel(kern, volume);
+         volume = distance_kernel(kern, volume, op->background);
+         break;
+
+      case GROUP:
+         volume = group_kernel(kern, volume, dtype, "tmptmp");
          break;
 
       case READ_KERNEL:
          /* free the existing kernel then set the pointer to the new one */
          free(kern);
-         kern = operation[c].kern;
+         kern = op->kern;
          setup_pad_values(kern);
          if(verbose){
             fprintf(stdout, "Input kernel:\n");
             print_kernel(kern);
             }
-
          break;
 
       case WRITE:
-         if(operation[c].outfile != NULL){
+         if(op->outfile != NULL){
             if(verbose){
-               fprintf(stdout, "Outputting to %s\n", operation[c].outfile);
+               fprintf(stdout, "Outputting to %s\n", op->outfile);
                }
-            output_modified_volume(operation[c].outfile,
+            output_modified_volume(op->outfile,
                                    NC_UNSPECIFIED, FALSE,
                                    0.0, 0.0, *volume, infile, arg_string, NULL);
             }
@@ -615,11 +480,71 @@ int main(int argc, char *argv[])
          break;
 
       default:
-         fprintf(stderr, "\nUnknown op: %c\n\n  %s -help  for ops\n\n", succ_txt[c], argv[0]);
+         fprintf(stderr, "\nThis is bad\n\n");
          exit(EXIT_FAILURE);
          }
       }
 
    delete_volume(*volume);
-   exit(EXIT_SUCCESS);
+   return (EXIT_SUCCESS);
+   }
+
+/* get a real from a char* stream                   */
+/* with possible trailing or leading square bracket */
+/* and possible leading ':'                         */
+/* return the string advanced to the next token or  */
+/* as it was input if nothing found                 */
+char    *get_real_from_string(char *string, double *value)
+{
+   char    *ptr;
+
+   /* skip a [ or : else we probably don't belong here */
+   if(string[0] == '[' || string[0] == ':'){
+      string++;
+      }
+
+   /* get a double */
+   *value = strtod(&string[0], &ptr);
+   
+   /* if nothing found return a default value */
+   if(&string[0] == ptr){
+      *value = DEF_DOUBLE;
+      }
+   
+   /* skip over a possible ']' */
+   if(ptr[0] == ']'){
+      ptr++;
+      }
+
+   return ptr;
+   }
+
+/* get the string between [ and ] from a char*      */
+/* return the string advanced to the next token or  */
+/* as it was input if nothing found                 */
+char    *get_string_from_string(char *string, char **value)
+{
+   int      offset;
+
+   /* initialise the return values first */
+   *value = NULL;
+
+   /* get the string if there is one */
+   if(string[0] == '['){
+      string++;
+
+      /* get the string */
+      offset = strcspn(string, "]");
+
+      *value = (char *)malloc(offset * sizeof(char));
+      strncpy(*value, string, offset);
+      string += offset;
+
+      /* skip over a possible ']' */
+      if(string[0] == ']'){
+         string++;
+         }
+      }
+
+   return string;
    }

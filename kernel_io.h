@@ -15,12 +15,6 @@ typedef struct {
    Real   **K;
    } Kernel;
 
-static   const STRING      KERNEL_FILE_HEADER   = "MNI Morphology Kernel File";
-static   const STRING      KERNEL_TYPE          = "Kernel_Type";
-static   const STRING      NORMAL_KERNEL        = "Normal_Kernel";
-static   const STRING      KERNEL               = "Kernel";
-
-
 /* returns a new B_Matrix struct (pointer) */
 Kernel *new_kernel(int nelems);
 

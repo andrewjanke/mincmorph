@@ -8,14 +8,13 @@
 #include "kernel_io.h"
 
 /* kernel functions */
-Volume  *pad_volume(Kernel * K, Volume * vol, double pad_value);
-Volume  *convolve_kernel(Kernel * K, Volume * vol);
-Volume  *erosion_kernel(Kernel * K, Volume * vol);
+Volume  *binarise(Volume * vol, nc_type dtype, double floor, double ceil, double foreground, double background);
+Volume  *clamp(Volume * vol, double floor, double ceil, double background);
+Volume  *pad(Kernel * K, Volume * vol, double background);
 Volume  *dilation_kernel(Kernel * K, Volume * vol);
-Volume  *distance_kernel(Kernel * K, Volume * vol);
-Volume  *group_kernel(Kernel * K, Volume * vol, char *group_file, 
-                      double gfloor, double gceil, int max_groups);
-Volume  *binarise(Volume * vol, double floor, double ceil);
-Volume  *pad_volume(Kernel * K, Volume * vol, double pad_value);
+Volume  *erosion_kernel(Kernel * K, Volume * vol);
+Volume  *convolve_kernel(Kernel * K, Volume * vol);
+Volume  *distance_kernel(Kernel * K, Volume * vol, double background);
+Volume  *group_kernel(Kernel * K, Volume * vol, nc_type dtype, char *group_file);
 
 #endif
