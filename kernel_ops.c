@@ -214,7 +214,7 @@ Volume  *dilation_kernel(Kernel * K, Volume * vol)
 /* perform a median kernel operation on a volume */
 Volume  *median_dilation_kernel(Kernel * K, Volume * vol)
 {
-   int      x, y, z, c, i, mark_sux;
+   int      x, y, z, c, i;
    int      sizes[MAX_VAR_DIMS];
    progress_struct progress;
    Volume   tmp_vol;
