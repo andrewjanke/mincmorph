@@ -190,11 +190,15 @@ Volume  *dilation_kernel(Kernel * K, Volume * vol)
             for(c = 0; c < K->nelems; c++){
                if(get_volume_real_value(*vol,
                                         z + K->K[c][2],
-                                        y + K->K[c][1], x + K->K[c][0], 0 + K->K[c][3],
-                                        0 + K->K[c][4]) < value){
-                  set_volume_real_value(*vol, z + K->K[c][2], y + K->K[c][1],
-                                        x + K->K[c][0], 0 + K->K[c][3], 0 + K->K[c][4],
-                                        value * K->K[c][5]);
+                                        y + K->K[c][1],
+                                        x + K->K[c][0],
+                                        0 + K->K[c][3], 0 + K->K[c][4]) < value){
+                  set_volume_real_value(*vol,
+                                        z + K->K[c][2],
+                                        y + K->K[c][1],
+                                        x + K->K[c][0],
+                                        0 + K->K[c][3],
+                                        0 + K->K[c][4], value * K->K[c][5]);
                   }
                }
             }
@@ -211,7 +215,7 @@ Volume  *dilation_kernel(Kernel * K, Volume * vol)
 /* perform an erosion on a volume */
 Volume  *erosion_kernel(Kernel * K, Volume * vol)
 {
-   int      x, y, z, c, count;
+   int      x, y, z, c;
    double   value;
    int      sizes[MAX_VAR_DIMS];
    progress_struct progress;
@@ -231,23 +235,22 @@ Volume  *erosion_kernel(Kernel * K, Volume * vol)
          for(x = -K->pre_pad[0]; x < sizes[2] - K->post_pad[0]; x++){
 
             value = get_volume_real_value(tmp_vol, z, y, x, 0, 0);
-
-            count = 0;
             for(c = 0; c < K->nelems; c++){
-               if(get_volume_real_value(tmp_vol,
+               if(get_volume_real_value(*vol,
                                         z + K->K[c][2],
-                                        y + K->K[c][1], x + K->K[c][0], 0 + K->K[c][3],
-                                        0 + K->K[c][4]) >= value){
-                  count++;
+                                        y + K->K[c][1],
+                                        x + K->K[c][0],
+                                        0 + K->K[c][3], 0 + K->K[c][4]) > value){
+                  set_volume_real_value(*vol,
+                                        z + K->K[c][2],
+                                        y + K->K[c][1],
+                                        x + K->K[c][0],
+                                        0 + K->K[c][3],
+                                        0 + K->K[c][4], value * K->K[c][5]);
                   }
                }
 
-            if(count == K->nelems){
-               set_volume_real_value(*vol, z, y, x, 0, 0, value);
-               }
-            else {
-               set_volume_real_value(*vol, z, y, x, 0, 0, 0.0);
-               }
+            value = get_volume_real_value(tmp_vol, z, y, x, 0, 0);
             }
          }
       update_progress_report(&progress, z + 1);

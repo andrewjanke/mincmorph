@@ -1,3 +1,7 @@
+2003-12-17  Andrew L. Janke  <rotor@cmr.uq.edu.au>
+
+   * Added support for grey level dilation and erosion
+
 2003-10-25  Andrew L. Janke  <rotor@cmr.uq.edu.au>
 
    * Completed initial auto-confiscation
