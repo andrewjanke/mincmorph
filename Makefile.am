@@ -3,7 +3,8 @@ ACLOCAL_AMFLAGS = -I m4
 
 bin_PROGRAMS = mincmorph
 
-EXTRA_DIST = $(m4_files)
+EXTRA_DIST = $(m4_files) \
+	epm-header.in
 
 m4_files = m4/mni_REQUIRE_LIB.m4 m4/mni_REQUIRE_MNILIBS.m4	 \
 	m4/mni_REQUIRE_OPENINVENTOR.m4				 \

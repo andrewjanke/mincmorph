@@ -1,0 +1,10 @@
+%product mincmorph
+%copyright 2000-2004 Andrew Janke
+%vendor McConnell Brain Imaging Centre
+%packager Andrew Janke <rotor@cmr.uq.edu.au>
+%license COPYING
+%readme README
+%description Extra minc package
+%version @VERSION@
+%requires netcdf
+%requires minc
