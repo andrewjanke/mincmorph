@@ -40,11 +40,14 @@ char    *get_string_from_string(char *string, char **value);
 void     calc_volume_range(Volume * vol, double *min, double *max);
 void     print_version_info(void);
 
+/* kernel names for pretty output */
+char    *KERN_names[] = { "NULL", "2D04", "2D08", "3D06", "3D26" };
+
 /* typedefs */
 typedef enum {
    UNDEF = 0,
    BINARISE, CLAMP, PAD, ERODE, DILATE, MDILATE,
-   OPEN, CLOSE, LPASS, HPASS, CONVOLVE, DISTANCE, 
+   OPEN, CLOSE, LPASS, HPASS, CONVOLVE, DISTANCE,
    GROUP, READ_KERNEL, WRITE
    } op_types;
 
@@ -52,7 +55,7 @@ typedef struct {
    op_types type;
    char     op_c;
    char    *kernel_fn;
-   kern_types  kernel_id;
+   kern_types kernel_id;
    char    *outfile;
    double   range[2];
    double   foreground;
@@ -130,7 +133,7 @@ ArgvInfo argTable[] = {
     "Use a 3D 27-connectivity kernel."},
    {"-kernel", ARGV_STRING, (char *)1, (char *)&kernel_fn,
     "<kernel.kern> read in a custom kernel file"},
-    
+
    {NULL, ARGV_HELP, NULL, NULL, "\nMorphology Options"},
    {"-floor", ARGV_FLOAT, (char *)1, (char *)&range[0],
     "lowwer value for binarising or clamping"},
@@ -187,7 +190,7 @@ int main(int argc, char *argv[])
    char    *outfile;
 
    Volume  *volume;
-   Kernel *kernel;
+   Kernel  *kernel;
    int      num_ops;
    Operation operation[100];
    Operation *op;
@@ -230,16 +233,16 @@ int main(int argc, char *argv[])
               argv[0], outfile);
       exit(EXIT_FAILURE);
       }
-   
+
    /* set the default kernel */
    if(kernel_fn == NULL && kernel_id == K_NULL){
       kernel_id = K_3D06;
       }
-   
+
    /* add the implicit read kernel operation */
    num_ops = 0;
    op = &operation[num_ops++];
-   
+
    op->type = READ_KERNEL;
    op->kernel_fn = kernel_fn;
    op->kernel_id = kernel_id;
@@ -255,7 +258,7 @@ int main(int argc, char *argv[])
       /* set up counters and extra text */
       strcpy(ext_txt, "");
       op = &operation[num_ops++];
-      
+
       /* get the operation type */
       op->op_c = ptr[0];
       ptr++;
@@ -345,25 +348,26 @@ int main(int argc, char *argv[])
 
       case 'R':
          op->type = READ_KERNEL;
-         
+
          /* get the filename */
          ptr = get_string_from_string(ptr, &tmp_str);
          if(tmp_str == NULL){
-            fprintf(stderr, "%s: R[TYPE|file.kern] requires a file or kernel name\n\n", argv[0]);
+            fprintf(stderr, "%s: R[TYPE|file.kern] requires a file or kernel name\n\n",
+                    argv[0]);
             exit(EXIT_FAILURE);
             }
-         
+
          /* check if the input kernel is an inbuilt one */
          op->kernel_id = K_NULL;
-         for(c=1; c<=n_inbuilt_kern; c++){
+         for(c = 1; c <= n_inbuilt_kern; c++){
             if(strcmp(tmp_str, KERN_names[c]) == 0){
-               op->kernel_id = (kern_types)c;
+               op->kernel_id = (kern_types) c;
                }
             }
-         
+
          /* if no inbuilt found, assume it's a file */
          if(op->kernel_id == K_NULL){
-       
+
             /* set up and check for the real filename */
             realpath(tmp_str, tmp_filename);
             if(access(tmp_filename, F_OK) != 0){
@@ -371,12 +375,12 @@ int main(int argc, char *argv[])
                        tmp_filename);
                exit(EXIT_FAILURE);
                }
-            
+
             op->kernel_fn = strdup(tmp_filename);
             sprintf(ext_txt, "kernel_fn: %s", op->kernel_fn);
             }
-         else{
-            sprintf(ext_txt, "inbuilt_kernel[%d]: %s", op->kernel_id, 
+         else {
+            sprintf(ext_txt, "inbuilt_kernel[%d]: %s", op->kernel_id,
                     KERN_names[op->kernel_id]);
             }
          break;
@@ -407,8 +411,7 @@ int main(int argc, char *argv[])
                  op->op_c, argv[0]);
          exit(EXIT_FAILURE);
          }
-      
-      
+
       if(verbose){
          fprintf(stdout, "  Op[%02d] %c = %d\t\t%s\n", num_ops, op->op_c, op->type,
                  ext_txt);
@@ -431,7 +434,7 @@ int main(int argc, char *argv[])
 
    /* init and then do some operations */
    kernel = new_kernel(0);
-   
+
    if(verbose){
       fprintf(stdout, "\n---Doing %d Operation(s)---\n", num_ops);
       }
@@ -500,40 +503,41 @@ int main(int argc, char *argv[])
       case READ_KERNEL:
          /* free the existing kernel then set the pointer to the new one */
          free(kernel);
-         
+
          /* read in the kernel or set the kernel to an inbuilt one */
          if(op->kernel_id == K_NULL){
 
             if(input_kernel(op->kernel_fn, kernel) != OK){
-               fprintf(stderr, "%s: Died reading in kernel file: %s\n\n", argv[0], op->kernel_fn);
+               fprintf(stderr, "%s: Died reading in kernel file: %s\n\n", argv[0],
+                       op->kernel_fn);
                exit(EXIT_FAILURE);
                }
             }
-         else{
-            
+         else {
+
             switch (op->kernel_id){
             case K_2D04:
                kernel = get_2D04_kernel();
                break;
-               
+
             case K_2D08:
                kernel = get_2D08_kernel();
                break;
-            
+
             case K_3D06:
                kernel = get_3D06_kernel();
                break;
-            
-            case K_3D26: 
+
+            case K_3D26:
                kernel = get_3D26_kernel();
                break;
-            
-            default: 
+
+            default:
                fprintf(stderr, "%s: This shouldn't happen -- much bad\n\n", argv[0]);
                exit(EXIT_FAILURE);
                }
             }
-         
+
          setup_pad_values(kernel);
          if(verbose){
             fprintf(stdout, "Input kernel:\n");
@@ -547,7 +551,7 @@ int main(int argc, char *argv[])
                     argv[0]);
             exit(EXIT_FAILURE);
             }
-         
+
          if(verbose){
             fprintf(stdout, "Outputting to %s\n", op->outfile);
             }
@@ -575,10 +579,10 @@ int main(int argc, char *argv[])
          exit(EXIT_FAILURE);
          }
       }
-   
+
    /* jump through operations freeing stuff */
    // free(op.kernel);
-   
+
    delete_volume(*volume);
    return (EXIT_SUCCESS);
    }

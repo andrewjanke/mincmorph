@@ -164,6 +164,7 @@ Volume  *pad(Kernel * K, Volume * vol, double bg)
 
    return (vol);
    }
+
 /* perform a dilation on a volume */
 Volume  *dilation_kernel(Kernel * K, Volume * vol)
 {
@@ -211,7 +212,7 @@ Volume  *dilation_kernel(Kernel * K, Volume * vol)
    terminate_progress_report(&progress);
    return (vol);
    }
-   
+
 /* perform a median kernel operation on a volume */
 Volume  *median_dilation_kernel(Kernel * K, Volume * vol)
 {
@@ -220,7 +221,7 @@ Volume  *median_dilation_kernel(Kernel * K, Volume * vol)
    progress_struct progress;
    Volume   tmp_vol;
    double   value;
-   
+
    unsigned int kvalue;
    unsigned int neighbours[K->nelems];
 
@@ -232,44 +233,44 @@ Volume  *median_dilation_kernel(Kernel * K, Volume * vol)
 
    /* copy the volume */
    tmp_vol = copy_volume(*vol);
-   
+
    for(z = -K->pre_pad[2]; z < sizes[0] - K->post_pad[2]; z++){
       for(y = -K->pre_pad[1]; y < sizes[1] - K->post_pad[1]; y++){
          for(x = -K->pre_pad[0]; x < sizes[2] - K->post_pad[0]; x++){
-            
+
             /* only modify background voxels */
             value = get_volume_voxel_value(tmp_vol, z, y, x, 0, 0);
             if(value == 0.0){
-               
+
                i = 0;
                for(c = 0; c < K->nelems; c++){
-               
+
                   kvalue = (unsigned int)get_volume_voxel_value(tmp_vol,
-                                        z + K->K[c][2],
-                                        y + K->K[c][1],
-                                        x + K->K[c][0],
-                                        0 + K->K[c][3], 0 + K->K[c][4]);
+                                                                z + K->K[c][2],
+                                                                y + K->K[c][1],
+                                                                x + K->K[c][0],
+                                                                0 + K->K[c][3],
+                                                                0 + K->K[c][4]);
                   if(kvalue != 0){
                      neighbours[i] = kvalue;
                      i++;
                      }
                   }
-               
+
                /* only run this for adjacent voxels */
                if(i > 0){
-                  
+
                   /* find the median of our little array */
-                  qsort(&neighbours[0], (size_t)i, sizeof(unsigned int),
-                        &compare_ints);
-                  
+                  qsort(&neighbours[0], (size_t) i, sizeof(unsigned int), &compare_ints);
+
                   /* store the median value */
-                  set_volume_voxel_value(*vol, z, y, x, 0, 0, 
-                                         (double)neighbours[(int)floor((i-1)/2)]);
+                  set_volume_voxel_value(*vol, z, y, x, 0, 0,
+                                         (double)neighbours[(int)floor((i - 1) / 2)]);
                   }
                }
-            
+
             /* else just copy the original value over */
-            else{
+            else {
                set_volume_voxel_value(*vol, z, y, x, 0, 0, value);
                }
             }
