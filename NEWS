@@ -1,6 +1,7 @@
         New in Release 1.3
 
 * Added epm-header for automagic binary packaging
+* Fixed bug with reading in and mallocing of kernel file names
 
         New in Release 1.2
 

@@ -1,3 +1,9 @@
+
+2004-04-14 Andrew L. Janke  <rotor@cmr.uq.edu.au>
+
+   * Fixed bug in get_string_from_string() mallocing
+   * Added epm header
+
 2003-12-17  Andrew L. Janke  <rotor@cmr.uq.edu.au>
 
    * Added support for grey level dilation and erosion

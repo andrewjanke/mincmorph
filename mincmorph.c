@@ -190,8 +190,8 @@ int main(int argc, char *argv[])
 
    /* Get arguments */
    if(ParseArgv(&argc, argv, argTable, 0) || (argc < 2)){
-      (void)fprintf(stderr, "\nUsage: %s [options] <in.mnc> <out.mnc>\n", argv[0]);
-      (void)fprintf(stderr, "       %s -help\n\n", argv[0]);
+      fprintf(stderr, "\nUsage: %s [options] <in.mnc> <out.mnc>\n", argv[0]);
+      fprintf(stderr, "       %s -help\n\n", argv[0]);
       exit(EXIT_FAILURE);
       }
    infile = argv[1];
@@ -334,7 +334,7 @@ int main(int argc, char *argv[])
          /* get the filename */
          ptr = get_string_from_string(ptr, &tmp_str);
          if(tmp_str == NULL){
-            fprintf(stderr, "%s: R[file.kern] _requires_ a filename\n\n", argv[0]);
+            fprintf(stderr, "%s: R[file.kern] requires a filename\n\n", argv[0]);
             exit(EXIT_FAILURE);
             }
 
@@ -542,12 +542,13 @@ char    *get_real_from_string(char *string, double *value)
    return ptr;
    }
 
-/* get the string between [ and ] from a char*      */
-/* return the string advanced to the next token or  */
-/* as it was input if nothing found                 */
+/* get a copy of the string between [ and ] from a char*      */
+/* return the string advanced to the next token or            */
+/* as it was input if nothing found                           */
 char    *get_string_from_string(char *string, char **value)
 {
    int      offset;
+   char    *malloc_string;
 
    /* initialise the return values first */
    *value = NULL;
@@ -556,14 +557,21 @@ char    *get_string_from_string(char *string, char **value)
    if(string[0] == '['){
       string++;
 
-      /* get the string */
+      /* get the length of the string in question */
       offset = strcspn(string, "]");
 
-      *value = (char *)malloc(offset * sizeof(char));
-      strncpy(*value, string, offset);
-      string += offset;
+      /* alloc some space for the string */
+      malloc_string = (char *)malloc((offset + 1) * sizeof(char));
 
-      /* skip over a possible ']' */
+      /* get a copy of it and append the null charater */
+      strncpy(malloc_string, string, offset);
+      malloc_string[offset] = '\0';
+
+      /* store the result */
+      *value = malloc_string;
+
+      /* increment the pointer and skip over a possible '[' */
+      string += offset;
       if(string[0] == ']'){
          string++;
          }
