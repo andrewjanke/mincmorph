@@ -132,7 +132,6 @@ ArgvInfo argTable[] = {
    {NULL, ARGV_HELP, (char *)NULL, (char *)NULL, "\nSuccessive morphological operations:"},
    {"-successive", ARGV_STRING, (char *)1, (char *)&succ_txt, successive_help},
 
-
    {NULL, ARGV_HELP, (char *)NULL, (char *)NULL, "\nXXXXXXX DON'T USE THESE! XXXXXXX"},
    {NULL, ARGV_HELP, (char *)NULL, (char *)NULL, "XXX compatibility with binop XXX"},
    {"-objlimit", ARGV_INT, (char *)1, (char *)&max_groups,

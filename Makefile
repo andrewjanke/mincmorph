@@ -3,7 +3,7 @@ OBJS = $(PROGS:=.o) kernel_io.o kernel_ops.o
 
 CC=cc
 
-OPTIONS = -O3 -w
+OPTIONS = -O3 -w2
 INCLUDES = -I/usr/local/include
 CFLAGS = $(OPTIONS) $(INCLUDES)
 

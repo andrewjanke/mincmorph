@@ -208,7 +208,6 @@ Volume  *dilation_kernel(Kernel * K, Volume * vol)
 /* from the original 2 pass Borgefors alg      */
 Volume  *distance_kernel(Kernel * K, Volume * vol)
 {
-
    int      x, y, z, c;
    double   value, min;
    int      sizes[MAX_VAR_DIMS];
