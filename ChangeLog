@@ -1,3 +1,8 @@
+2004-10-08 Andrew L. Janke  <rotor@cmr.uq.edu.au>
+
+   * Added 4 inbuilt kernels
+   * major clean-up of code ready for inclusion into MINC proper
+
 2004-05-25 Andrew L. Janke  <rotor@cmr.uq.edu.au>
 
    * Added -median_dilate option for mark

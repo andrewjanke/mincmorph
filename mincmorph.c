@@ -129,8 +129,8 @@ ArgvInfo argTable[] = {
     "Use a 2D 8-connectivity kernel."},
    {"-3D06", ARGV_CONSTANT, (char *)K_3D06, (char *)&kernel_id,
     "Use a 3D 6-connectivity kernel. (default)"},
-   {"-3D27", ARGV_CONSTANT, (char *)K_3D26, (char *)&kernel_id,
-    "Use a 3D 27-connectivity kernel."},
+   {"-3D26", ARGV_CONSTANT, (char *)K_3D26, (char *)&kernel_id,
+    "Use a 3D 26-connectivity kernel."},
    {"-kernel", ARGV_STRING, (char *)1, (char *)&kernel_fn,
     "<kernel.kern> read in a custom kernel file"},
 
