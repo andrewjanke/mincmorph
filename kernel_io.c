@@ -1,15 +1,14 @@
 /* kernel_io.c - reads kernel files */
 
-
 #include "kernel_io.h"
 #define MAX_KERNEL_ELEMS 1000
 
 extern int verbose;
 
-static   const STRING      KERNEL_FILE_HEADER   = "MNI Morphology Kernel File";
-static   const STRING      KERNEL_TYPE          = "Kernel_Type";
-static   const STRING      NORMAL_KERNEL        = "Normal_Kernel";
-static   const STRING      KERNEL               = "Kernel";
+static const STRING KERNEL_FILE_HEADER = "MNI Morphology Kernel File";
+static const STRING KERNEL_TYPE = "Kernel_Type";
+static const STRING NORMAL_KERNEL = "Normal_Kernel";
+static const STRING KERNEL = "Kernel";
 
 /* returns a new Kernel struct (pointer)                */
 Kernel  *new_kernel(int nelems)
@@ -116,7 +115,7 @@ Status input_kernel(const char *kernel_file, Kernel * kernel)
          if(mni_input_real(file, &tmp_real) == OK){
             kernel->K[i][j] = tmp_real;
             }
-         else{
+         else {
             /* check for end */
             if(mni_skip_expected_character(file, (char)';') == OK){
                kernel->nelems = i;
@@ -125,8 +124,9 @@ Status input_kernel(const char *kernel_file, Kernel * kernel)
                   }
                return (OK);
                }
-            else{
-               print_error("input_kernel(): error reading kernel [%d,%d]\n", i + 1, j + 1);
+            else {
+               print_error("input_kernel(): error reading kernel [%d,%d]\n", i + 1,
+                           j + 1);
                return (ERROR);
                }
             }
@@ -207,7 +207,7 @@ void setup_def_kernel(Kernel * K)
          if(j == 5){
             K->K[i][j] = 1.0;
             }
-         else{
+         else {
             K->K[i][j] = 0.0;
             }
          }

@@ -10,12 +10,11 @@ void     split_kernel(Kernel * K, Kernel * k1, Kernel * k2);
 int      compare_ints(const void *a, const void *b);
 int      compare_groups(const void *a, const void *b);
 
-
 /* structure for group information */
 typedef struct {
    unsigned int orig_label;
    unsigned int count;
-} group_info_struct;
+   } group_info_struct;
 
 typedef group_info_struct *Group_info;
 
@@ -37,13 +36,13 @@ void split_kernel(Kernel * K, Kernel * k1, Kernel * k2)
    k1c = k2c = 0;
    for(c = 0; c < K->nelems; c++){
       if((K->K[c][2] < 0) ||
-          (K->K[c][1] < 0 && K->K[c][2] <= 0) ||
-          (K->K[c][0] < 0 && K->K[c][1] <= 0 && K->K[c][2] <= 0)){
+         (K->K[c][1] < 0 && K->K[c][2] <= 0) ||
+         (K->K[c][0] < 0 && K->K[c][1] <= 0 && K->K[c][2] <= 0)){
 
          k1->K[k1c] = K->K[c];
          k1c++;
          }
-      else{
+      else {
          k2->K[k2c] = K->K[c];
          k2c++;
          }
@@ -74,7 +73,7 @@ Volume  *binarise(Volume * vol, double floor, double ceil, double fg, double bg)
             if((value >= floor) && (value <= ceil)){
                set_volume_voxel_value(*vol, z, y, x, 0, 0, fg);
                }
-            else{
+            else {
                set_volume_voxel_value(*vol, z, y, x, 0, 0, bg);
                }
 
@@ -190,9 +189,9 @@ Volume  *dilation_kernel(Kernel * K, Volume * vol)
             value = get_volume_real_value(tmp_vol, z, y, x, 0, 0);
             for(c = 0; c < K->nelems; c++){
                if(get_volume_real_value(*vol,
-                                         z + K->K[c][2],
-                                         y + K->K[c][1], x + K->K[c][0], 0 + K->K[c][3],
-                                         0 + K->K[c][4]) < value){
+                                        z + K->K[c][2],
+                                        y + K->K[c][1], x + K->K[c][0], 0 + K->K[c][3],
+                                        0 + K->K[c][4]) < value){
                   set_volume_real_value(*vol, z + K->K[c][2], y + K->K[c][1],
                                         x + K->K[c][0], 0 + K->K[c][3], 0 + K->K[c][4],
                                         value * K->K[c][5]);
@@ -236,9 +235,9 @@ Volume  *erosion_kernel(Kernel * K, Volume * vol)
             count = 0;
             for(c = 0; c < K->nelems; c++){
                if(get_volume_real_value(tmp_vol,
-                                         z + K->K[c][2],
-                                         y + K->K[c][1], x + K->K[c][0], 0 + K->K[c][3],
-                                         0 + K->K[c][4]) >= value){
+                                        z + K->K[c][2],
+                                        y + K->K[c][1], x + K->K[c][0], 0 + K->K[c][3],
+                                        0 + K->K[c][4]) >= value){
                   count++;
                   }
                }
@@ -246,7 +245,7 @@ Volume  *erosion_kernel(Kernel * K, Volume * vol)
             if(count == K->nelems){
                set_volume_real_value(*vol, z, y, x, 0, 0, value);
                }
-            else{
+            else {
                set_volume_real_value(*vol, z, y, x, 0, 0, 0.0);
                }
             }
@@ -301,7 +300,6 @@ Volume  *convolve_kernel(Kernel * K, Volume * vol)
    return (vol);
    }
 
-
 /* should really only work on binary images    */
 /* from the original 2 pass Borgefors alg      */
 Volume  *distance_kernel(Kernel * K, Volume * vol, double bg)
@@ -316,6 +314,9 @@ Volume  *distance_kernel(Kernel * K, Volume * vol, double bg)
    k1 = new_kernel(K->nelems);
    k2 = new_kernel(K->nelems);
    split_kernel(K, k1, k2);
+
+   setup_pad_values(k1);
+   setup_pad_values(k2);
 
    if(verbose){
       fprintf(stdout, "Distance kernel - background %g\n", bg);
@@ -356,14 +357,14 @@ Volume  *distance_kernel(Kernel * K, Volume * vol, double bg)
       }
 
    /* reverse raster direction */
-   for(z = sizes[0] - K->post_pad[0] - 1; z > -K->pre_pad[0]; z--){
-      for(y = sizes[1] - K->post_pad[1] - 1; y > -K->pre_pad[1]; y--){
-         for(x = sizes[2] - K->post_pad[2] - 1; x > -K->pre_pad[2]; x--){
+   for(z = sizes[0] - k2->post_pad[2] - 1; z >= -k2->pre_pad[2]; z--){
+      for(y = sizes[1] - k2->post_pad[1] - 1; y >= -k2->pre_pad[1]; y--){
+         for(x = sizes[2] - k2->post_pad[0] - 1; x >= -k2->pre_pad[0]; x--){
 
             min = get_volume_real_value(*vol, z, y, x, 0, 0);
-            if(min > bg){
+            if(min != bg){
 
-               /* find the minimum distance to 0 in the neighbouring vectors */
+               /* find the minimum distance to bg in the neighbouring vectors */
                for(c = 0; c < k2->nelems; c++){
                   value = get_volume_real_value(*vol,
                                                 z + k2->K[c][2],
@@ -414,10 +415,8 @@ Volume  *group_kernel(Kernel * K, Volume * vol, double bg)
    unsigned int prev_label;
    unsigned int num_matches;
 
-
    /* structure for group data */
    Group_info *group_data;
-
 
    /* split the Kernel into forward and backwards kernels */
    k1 = new_kernel(K->nelems);
@@ -523,7 +522,7 @@ Volume  *group_kernel(Kernel * K, Volume * vol, double bg)
 
                      /* recurse this label if we haven't yet */
                      if(curr_label != prev_label){
-                        while (equiv[curr_label] != equiv[equiv[curr_label]]){
+                        while(equiv[curr_label] != equiv[equiv[curr_label]]){
                            curr_label = equiv[curr_label];
                            }
 
@@ -542,7 +541,7 @@ Volume  *group_kernel(Kernel * K, Volume * vol, double bg)
                      curr_label = neighbours[c];
 
                      if(curr_label != prev_label){
-                        while (equiv[curr_label] != equiv[equiv[curr_label]]){
+                        while(equiv[curr_label] != equiv[equiv[curr_label]]){
                            curr_label = equiv[curr_label];
 
                            equiv[curr_label] = min_label;
@@ -561,7 +560,7 @@ Volume  *group_kernel(Kernel * K, Volume * vol, double bg)
                   set_volume_voxel_value(*vol, z, y, x, 0, 0, (Real) min_label);
                   counts[min_label]++;
                   break;
-               }                       /* end case */
+                  }                       /* end case */
 
                }
             }
@@ -569,7 +568,6 @@ Volume  *group_kernel(Kernel * K, Volume * vol, double bg)
       update_progress_report(&progress, z + 1);
       }
    terminate_progress_report(&progress);
-
 
    /* reduce the equiv and counts array */
    num_groups = 0;
@@ -580,7 +578,7 @@ Volume  *group_kernel(Kernel * K, Volume * vol, double bg)
 
          /* find the min label value */
          min_label = equiv[c];
-         while (min_label != equiv[min_label]){
+         while(min_label != equiv[min_label]){
             min_label = equiv[min_label];
             }
 
@@ -589,7 +587,7 @@ Volume  *group_kernel(Kernel * K, Volume * vol, double bg)
          counts[min_label] += counts[c];
          counts[c] = 0;
          }
-      else{
+      else {
          num_groups++;
          }
       }

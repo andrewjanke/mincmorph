@@ -25,7 +25,6 @@
 /*                              - replaced K (Keep) option with Clamp.       */
 /*                              - introduced notion of fore and back colors  */
 
-
 #include <stdlib.h>
 #include <sys/param.h>
 #include <unistd.h>
@@ -50,7 +49,7 @@ typedef enum {
    BINARISE, CLAMP, PAD, ERODE, DILATE,
    OPEN, CLOSE, LPASS, HPASS, CONVOLVE,
    DISTANCE, GROUP, READ_KERNEL, WRITE
-} op_types;
+   } op_types;
 
 typedef struct {
    op_types type;
@@ -60,7 +59,7 @@ typedef struct {
    double   range[2];
    double   foreground;
    double   background;
-} Operation;
+   } Operation;
 
 /* Argument variables */
 int      verbose = FALSE;
@@ -157,7 +156,7 @@ ArgvInfo argTable[] = {
 
    {NULL, ARGV_HELP, NULL, NULL, ""},
    {NULL, ARGV_END, NULL, NULL, NULL}
-};
+   };
 
 int main(int argc, char *argv[])
 {
@@ -209,7 +208,7 @@ int main(int argc, char *argv[])
    if(kernel_fn == NULL){
       setup_def_kernel(kern);
       }
-   else{
+   else {
       if(access(kernel_fn, F_OK) != 0){
          fprintf(stderr, "%s: Couldn't find kernel file: %s\n\n", argv[0], kernel_fn);
          exit(EXIT_FAILURE);
@@ -233,7 +232,7 @@ int main(int argc, char *argv[])
 
    num_ops = 0;
    ptr = succ_txt;
-   while (ptr[0] != '\0'){
+   while(ptr[0] != '\0'){
 
       /* set up counters and extra text */
       strcpy(ext_txt, "");
@@ -490,7 +489,7 @@ int main(int argc, char *argv[])
                                    dtype, FALSE,
                                    0.0, 0.0, *volume, infile, arg_string, NULL);
             }
-         else{
+         else {
             fprintf(stdout, "%s: WRITE passed a NULL pointer! - this is bad\n\n",
                     argv[0]);
             exit(EXIT_FAILURE);
