@@ -1,5 +1,6 @@
 /* kernel_ops.c */
 
+#include <float.h>
 #include <limits.h>
 #include "kernel_ops.h"
 

@@ -3,7 +3,6 @@
 #ifndef KERNEL_OPS
 #define KERNEL_OPS
 
-#include <float.h>
 #include <volume_io.h>
 #include "kernel_io.h"
 

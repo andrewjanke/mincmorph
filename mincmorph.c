@@ -11,33 +11,28 @@
 /* author and the University of Queensland make no representations about the */
 /* suitability of this software for any purpose.  It is provided "as is"     */
 /* without express or implied warranty.                                      */
-/*                                                                           */
-/* Morphology on a minc volume...                                            */
-/*    o Erosions                                                             */
-/*    o Dilations                                                            */
-/*    o Group counts (mm and voxel)                                          */
-/*    o Arbitrary kernels                                                    */
-/*                                                                           */
-/* Fri Jan 18 11:41:08 EST 2002 - initial version from mincgroup             */
-/* Mon Jan 28 11:41:37 EST 2002 - first version that works                   */
-/* Mon Nov 25 16:32:54 EST 2002 - rewrote most of the successive text parser */
-/*                              - simplified Group option for flexibility    */
-/*                              - replaced K (Keep) option with Clamp.       */
-/*                              - introduced notion of fore and back colors  */
 
 #include <config.h>
 #include <stdlib.h>
-#include <sys/param.h>
+#include <stdio.h>
 #include <unistd.h>
+#include <sys/param.h>
 #include <float.h>
+#include <string.h>
+
 #include <volume_io.h>
+/* someone fix volume_io! */
+#undef X
+#undef Y
+#undef Z
+
 #include <ParseArgv.h>
 #include <time_stamp.h>
 #include "kernel_io.h"
 #include "kernel_ops.h"
 
 #define INTERNAL_PREC NC_FLOAT         /* should be NC_FLOAT or NC_DOUBLE */
-#define DEF_DOUBLE -1
+#define DEF_DOUBLE -DBL_MAX
 
 /* function prototypes */
 char    *get_real_from_string(char *string, double *value);
@@ -56,7 +51,8 @@ typedef enum {
 typedef struct {
    op_types type;
    char     op_c;
-   Kernel  *kern;
+   char    *kernel_fn;
+   kern_types  kernel_id;
    char    *outfile;
    double   range[2];
    double   foreground;
@@ -66,10 +62,12 @@ typedef struct {
 /* Argument variables */
 int      verbose = FALSE;
 int      clobber = FALSE;
+int      is_signed = FALSE;
 nc_type  dtype = NC_SHORT;
 double   range[2] = { -DBL_MAX, DBL_MAX };
 double   foreground = 1.0;
 double   background = 0.0;
+kern_types kernel_id = K_NULL;
 char    *kernel_fn = NULL;
 char    *succ_txt = "B";
 
@@ -87,7 +85,7 @@ char     successive_help[] = "Successive operations (Maximum: 100) \
 \n\tX - convolve \
 \n\tF - distance transform (binary input only - not checked) \
 \n\tG - Label the groups in the volume in ascending order \
-\n\tR[file.kern] - read in a kernel file \
+\n\tR[TYPE|file.kern] - (2D04|2D08|3D06|3D26) or read in a kernel file \
 \n\tW[file.mnc]  - write out current results \
 \n\tDefault: ";
 
@@ -103,7 +101,7 @@ ArgvInfo argTable[] = {
     "clobber existing files"},
 
    {NULL, ARGV_HELP, NULL, NULL,
-    "\nOutfile Options (NB: this effects internal precision, int or short suggested)"},
+    "\nOutfile Options"},
    {"-filetype", ARGV_CONSTANT, (char *)NC_UNSPECIFIED, (char *)&dtype,
     "Use data type of the input file."},
    {"-byte", ARGV_CONSTANT, (char *)NC_BYTE, (char *)&dtype,
@@ -116,10 +114,24 @@ ArgvInfo argTable[] = {
     "Write out single-precision data."},
    {"-double", ARGV_CONSTANT, (char *)NC_DOUBLE, (char *)&dtype,
     "Write out double-precision data."},
+   {"-signed", ARGV_CONSTANT, (char *)TRUE, (char *)&is_signed,
+    "Write signed integer data."},
+   {"-unsigned", ARGV_CONSTANT, (char *)FALSE, (char *)&is_signed,
+    "Write unsigned integer data."},
 
-   {NULL, ARGV_HELP, NULL, NULL, "\nMorphology Options"},
+   {NULL, ARGV_HELP, NULL, NULL, "\nKernel Options"},
+   {"-2D04", ARGV_CONSTANT, (char *)K_2D04, (char *)&kernel_id,
+    "Use a 2D 4-connectivity kernel."},
+   {"-2D08", ARGV_CONSTANT, (char *)K_2D08, (char *)&kernel_id,
+    "Use a 2D 8-connectivity kernel."},
+   {"-3D06", ARGV_CONSTANT, (char *)K_3D06, (char *)&kernel_id,
+    "Use a 3D 6-connectivity kernel. (default)"},
+   {"-3D27", ARGV_CONSTANT, (char *)K_3D26, (char *)&kernel_id,
+    "Use a 3D 27-connectivity kernel."},
    {"-kernel", ARGV_STRING, (char *)1, (char *)&kernel_fn,
-    "<kernel.kern> read in a kernel file"},
+    "<kernel.kern> read in a custom kernel file"},
+    
+   {NULL, ARGV_HELP, NULL, NULL, "\nMorphology Options"},
    {"-floor", ARGV_FLOAT, (char *)1, (char *)&range[0],
     "lowwer value for binarising or clamping"},
    {"-ceil", ARGV_FLOAT, (char *)1, (char *)&range[1],
@@ -175,7 +187,7 @@ int main(int argc, char *argv[])
    char    *outfile;
 
    Volume  *volume;
-   Kernel  *kern;
+   Kernel *kernel;
    int      num_ops;
    Operation operation[100];
    Operation *op;
@@ -212,41 +224,38 @@ int main(int argc, char *argv[])
       exit(EXIT_FAILURE);
       }
 
-   /* setup the default kernel or read in a kernel file */
-   kern = new_kernel(6);
-   if(kernel_fn == NULL){
-      setup_def_kernel(kern);
+   /* check kernel args */
+   if(kernel_fn != NULL && kernel_id != K_NULL){
+      fprintf(stderr, "%s: specify either a kernel file or a set kernel (not both)\n\n",
+              argv[0], outfile);
+      exit(EXIT_FAILURE);
       }
-   else {
-      if(access(kernel_fn, F_OK) != 0){
-         fprintf(stderr, "%s: Couldn't find kernel file: %s\n\n", argv[0], kernel_fn);
-         exit(EXIT_FAILURE);
-         }
-
-      if(input_kernel(kernel_fn, kern) != OK){
-         fprintf(stderr, "%s: Died reading in kernel file: %s\n\n", argv[0], kernel_fn);
-         exit(EXIT_FAILURE);
-         }
-      if(verbose){
-         fprintf(stdout, "Input kernel:\n");
-         print_kernel(kern);
-         }
+   
+   /* set the default kernel */
+   if(kernel_fn == NULL && kernel_id == K_NULL){
+      kernel_id = K_3D06;
       }
-   setup_pad_values(kern);
+   
+   /* add the implicit read kernel operation */
+   num_ops = 0;
+   op = &operation[num_ops++];
+   
+   op->type = READ_KERNEL;
+   op->kernel_fn = kernel_fn;
+   op->kernel_id = kernel_id;
 
    /* setup operations and check them... */
    if(verbose){
       fprintf(stdout, "---Checking Operation(s): %s---\n", succ_txt);
       }
 
-   num_ops = 0;
    ptr = succ_txt;
    while(ptr[0] != '\0'){
 
       /* set up counters and extra text */
       strcpy(ext_txt, "");
       op = &operation[num_ops++];
-
+      
       /* get the operation type */
       op->op_c = ptr[0];
       ptr++;
@@ -336,29 +345,40 @@ int main(int argc, char *argv[])
 
       case 'R':
          op->type = READ_KERNEL;
-         op->kern = new_kernel(0);
-
+         
          /* get the filename */
          ptr = get_string_from_string(ptr, &tmp_str);
          if(tmp_str == NULL){
-            fprintf(stderr, "%s: R[file.kern] requires a filename\n\n", argv[0]);
+            fprintf(stderr, "%s: R[TYPE|file.kern] requires a file or kernel name\n\n", argv[0]);
             exit(EXIT_FAILURE);
             }
-
-         /* set up and check for the real filename */
-         realpath(tmp_str, tmp_filename);
-         if(access(tmp_filename, F_OK) != 0){
-            fprintf(stderr, "%s: Couldn't find kernel file: %s\n\n", argv[0],
-                    tmp_filename);
-            exit(EXIT_FAILURE);
+         
+         /* check if the input kernel is an inbuilt one */
+         op->kernel_id = K_NULL;
+         for(c=1; c<=n_inbuilt_kern; c++){
+            if(strcmp(tmp_str, KERN_names[c]) == 0){
+               op->kernel_id = (kern_types)c;
+               }
             }
-
-         if(input_kernel(tmp_str, op->kern) != OK){
-            fprintf(stderr, "%s: Died reading in kernel file: %s\n\n", argv[0], tmp_str);
-            exit(EXIT_FAILURE);
+         
+         /* if no inbuilt found, assume it's a file */
+         if(op->kernel_id == K_NULL){
+       
+            /* set up and check for the real filename */
+            realpath(tmp_str, tmp_filename);
+            if(access(tmp_filename, F_OK) != 0){
+               fprintf(stderr, "%s: Couldn't find kernel file: %s\n\n", argv[0],
+                       tmp_filename);
+               exit(EXIT_FAILURE);
+               }
+            
+            op->kernel_fn = strdup(tmp_filename);
+            sprintf(ext_txt, "kernel_fn: %s", op->kernel_fn);
             }
-
-         sprintf(ext_txt, "kernel: %s", tmp_str);
+         else{
+            sprintf(ext_txt, "inbuilt_kernel[%d]: %s", op->kernel_id, 
+                    KERN_names[op->kernel_id]);
+            }
          break;
 
       case 'W':
@@ -387,7 +407,8 @@ int main(int argc, char *argv[])
                  op->op_c, argv[0]);
          exit(EXIT_FAILURE);
          }
-
+      
+      
       if(verbose){
          fprintf(stdout, "  Op[%02d] %c = %d\t\t%s\n", num_ops, op->op_c, op->type,
                  ext_txt);
@@ -408,7 +429,9 @@ int main(int argc, char *argv[])
    get_type_range(get_volume_data_type(*volume), &min, &max);
    set_volume_real_range(*volume, min, max);
 
-   /* do some operations */
+   /* init and then do some operations */
+   kernel = new_kernel(0);
+   
    if(verbose){
       fprintf(stdout, "\n---Doing %d Operation(s)---\n", num_ops);
       }
@@ -426,36 +449,36 @@ int main(int argc, char *argv[])
          break;
 
       case PAD:
-         volume = pad(kern, volume, op->background);
+         volume = pad(kernel, volume, op->background);
          break;
 
       case ERODE:
-         volume = erosion_kernel(kern, volume);
+         volume = erosion_kernel(kernel, volume);
          break;
 
       case DILATE:
-         volume = dilation_kernel(kern, volume);
+         volume = dilation_kernel(kernel, volume);
          break;
 
       case MDILATE:
-         volume = median_dilation_kernel(kern, volume);
+         volume = median_dilation_kernel(kernel, volume);
          break;
 
       case OPEN:
-         volume = erosion_kernel(kern, volume);
-         volume = dilation_kernel(kern, volume);
+         volume = erosion_kernel(kernel, volume);
+         volume = dilation_kernel(kernel, volume);
          break;
 
       case CLOSE:
-         volume = dilation_kernel(kern, volume);
-         volume = erosion_kernel(kern, volume);
+         volume = dilation_kernel(kernel, volume);
+         volume = erosion_kernel(kernel, volume);
          break;
 
       case LPASS:
-         volume = erosion_kernel(kern, volume);
-         volume = dilation_kernel(kern, volume);
-         volume = dilation_kernel(kern, volume);
-         volume = erosion_kernel(kern, volume);
+         volume = erosion_kernel(kernel, volume);
+         volume = dilation_kernel(kernel, volume);
+         volume = dilation_kernel(kernel, volume);
+         volume = erosion_kernel(kernel, volume);
          break;
 
       case HPASS:
@@ -463,62 +486,99 @@ int main(int argc, char *argv[])
          break;
 
       case CONVOLVE:
-         volume = convolve_kernel(kern, volume);
+         volume = convolve_kernel(kernel, volume);
          break;
 
       case DISTANCE:
-         volume = distance_kernel(kern, volume, background);
+         volume = distance_kernel(kernel, volume, background);
          break;
 
       case GROUP:
-         volume = group_kernel(kern, volume, background);
+         volume = group_kernel(kernel, volume, background);
          break;
 
       case READ_KERNEL:
          /* free the existing kernel then set the pointer to the new one */
-         free(kern);
-         kern = op->kern;
-         setup_pad_values(kern);
+         free(kernel);
+         
+         /* read in the kernel or set the kernel to an inbuilt one */
+         if(op->kernel_id == K_NULL){
+
+            if(input_kernel(op->kernel_fn, kernel) != OK){
+               fprintf(stderr, "%s: Died reading in kernel file: %s\n\n", argv[0], op->kernel_fn);
+               exit(EXIT_FAILURE);
+               }
+            }
+         else{
+            
+            switch (op->kernel_id){
+            case K_2D04:
+               kernel = get_2D04_kernel();
+               break;
+               
+            case K_2D08:
+               kernel = get_2D08_kernel();
+               break;
+            
+            case K_3D06:
+               kernel = get_3D06_kernel();
+               break;
+            
+            case K_3D26: 
+               kernel = get_3D26_kernel();
+               break;
+            
+            default: 
+               fprintf(stderr, "%s: This shouldn't happen -- much bad\n\n", argv[0]);
+               exit(EXIT_FAILURE);
+               }
+            }
+         
+         setup_pad_values(kernel);
          if(verbose){
             fprintf(stdout, "Input kernel:\n");
-            print_kernel(kern);
+            print_kernel(kernel);
             }
          break;
 
       case WRITE:
-         if(op->outfile != NULL){
-            if(verbose){
-               fprintf(stdout, "Outputting to %s\n", op->outfile);
-               }
-
-            /* set the range to something sensible (if possible) */
-            calc_volume_range(volume, &min, &max);
-            if(dtype == NC_BYTE){
-               if(min >= 0 && max < 255){
-                  fprintf(stdout, "BYTE data, setting 1:1 mapping (0-256)\n");
-                  min = 0;
-                  max = 255;
-                  }
-               }
-            set_volume_real_range(*volume, min, max);
-
-            output_modified_volume(op->outfile,
-                                   dtype, FALSE,
-                                   0.0, 0.0, *volume, infile, arg_string, NULL);
-            }
-         else {
+         if(op->outfile == NULL){
             fprintf(stdout, "%s: WRITE passed a NULL pointer! - this is bad\n\n",
                     argv[0]);
             exit(EXIT_FAILURE);
             }
+         
+         if(verbose){
+            fprintf(stdout, "Outputting to %s\n", op->outfile);
+            }
+
+         /* get the resulting range */
+         calc_volume_range(volume, &min, &max);
+
+         /* set the range to something sensible (if possible) */
+         if(dtype == NC_BYTE && is_signed == FALSE){
+            if(min >= 0 && max < 255){
+               fprintf(stdout, "BYTE data, setting 1:1 mapping (0-256)\n");
+               min = 0;
+               max = 255;
+               }
+            }
+         set_volume_real_range(*volume, min, max);
+
+         output_modified_volume(op->outfile,
+                                dtype, is_signed,
+                                0.0, 0.0, *volume, infile, arg_string, NULL);
          break;
 
       default:
-         fprintf(stderr, "\n%s: This is vary bad, call Houston\n\n", argv[0]);
+         fprintf(stderr, "\n%s: This is very bad, call Houston\n\n", argv[0]);
          exit(EXIT_FAILURE);
          }
       }
-
+   
+   /* jump through operations freeing stuff */
+   // free(op.kernel);
+   
    delete_volume(*volume);
    return (EXIT_SUCCESS);
    }

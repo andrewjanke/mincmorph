@@ -1,5 +1,6 @@
 /* kernel_io.c - reads kernel files */
 
+#include <volume_io.h>
 #include "kernel_io.h"
 #define MAX_KERNEL_ELEMS 1000
 
@@ -13,18 +14,24 @@ static const STRING KERNEL = "Kernel";
 /* returns a new Kernel struct (pointer)                */
 Kernel  *new_kernel(int nelems)
 {
-   int      i;
+   int      i, j;
    Kernel  *tmp;
 
    ALLOC_VAR_SIZED_STRUCT(tmp, Real, 10);
 
-   /* allocate for the Kernel Array */
+   /* allocate and initialise the Kernel Array */
    SET_ARRAY_SIZE(tmp->K, 0, nelems, 10);
    for(i = 0; i < nelems; i++){
       ALLOC(tmp->K[i], KERNEL_DIMS + 1);
+      
+      for(j = 0; j < KERNEL_DIMS; j++){
+         tmp->K[i][j] = 0.0;
+         }
+      tmp->K[i][KERNEL_DIMS] = 1.0;
+      
       }
    tmp->nelems = nelems;
-
+   
    return tmp;
    }
 
@@ -188,7 +195,61 @@ int setup_pad_values(Kernel * kernel)
    return (TRUE);
    }
 
-/* create the default 3D 8 connectivity kernel           */
+/* 2D 4 connectivity kernel                              */
+/*            x       y       z       t       v   coeff  */
+/*      -----------------------------------------------  */
+/* [00]    1.00    0.00    0.00    0.00    0.00    1.00  */
+/* [01]   -1.00    0.00    0.00    0.00    0.00    1.00  */
+/* [02]    0.00    1.00    0.00    0.00    0.00    1.00  */
+/* [03]    0.00   -1.00    0.00    0.00    0.00    1.00  */
+Kernel *get_2D04_kernel(void)
+{
+   Kernel *K = new_kernel(4);
+   
+   K->K[0][0] = 1.0;
+   K->K[1][0] = -1.0;
+   K->K[2][1] = 1.0;
+   K->K[3][1] = -1.0;
+   
+   return K;
+   }
+
+/* 2D 8 connectivity kernel                              */
+/*            x       y       z       t       v   coeff  */
+/*      -----------------------------------------------  */ 
+/* [00]    1.00    1.00    0.00    0.00    0.00    1.00  */
+/* [01]    1.00    0.00    0.00    0.00    0.00    1.00  */
+/* [02]    1.00   -1.00    0.00    0.00    0.00    1.00  */
+/*                                                       */
+/* [03]    0.00    1.00    0.00    0.00    0.00    1.00  */
+/* [04]    0.00   -1.00    0.00    0.00    0.00    1.00  */
+/*                                                       */
+/* [05]   -1.00    1.00    0.00    0.00    0.00    1.00  */
+/* [06]   -1.00    0.00    0.00    0.00    0.00    1.00  */
+/* [07]   -1.00   -1.00    0.00    0.00    0.00    1.00  */
+Kernel *get_2D08_kernel(void)
+{
+   Kernel *K = new_kernel(8);
+   
+   K->K[0][0] = 1.0;
+   K->K[0][1] = 1.0;
+   K->K[1][0] = 1.0;
+   K->K[2][0] = 1.0;
+   K->K[2][1] = -1.0;
+   
+   K->K[3][1] = 1.0;
+   K->K[4][1] = -1.0;
+   
+   K->K[5][0] = -1.0;
+   K->K[5][1] = 1.0;
+   K->K[6][0] = -1.0;
+   K->K[7][0] = -1.0;
+   K->K[7][1] = -1.0;
+   
+   return K;
+   }
+
+/* 3D 6 connectivity kernel                              */
 /*            x       y       z       t       v   coeff  */
 /*      -----------------------------------------------  */
 /* [00]    1.00    0.00    0.00    0.00    0.00    1.00  */
@@ -197,27 +258,39 @@ int setup_pad_values(Kernel * kernel)
 /* [03]    0.00   -1.00    0.00    0.00    0.00    1.00  */
 /* [04]    0.00    0.00    1.00    0.00    0.00    1.00  */
 /* [05]    0.00    0.00   -1.00    0.00    0.00    1.00  */
-void setup_def_kernel(Kernel * K)
+Kernel *get_3D06_kernel(void)
 {
-   int      i, j;
-
-   /* first setup the "null" kernel */
-   for(i = 0; i < 6; i++){
-      for(j = 0; j < 6; j++){
-         if(j == 5){
-            K->K[i][j] = 1.0;
-            }
-         else {
-            K->K[i][j] = 0.0;
-            }
-         }
-      }
-
-   /* then fool with it */
+   Kernel *K = new_kernel(6);
+   
    K->K[0][0] = 1.0;
    K->K[1][0] = -1.0;
    K->K[2][1] = 1.0;
    K->K[3][1] = -1.0;
    K->K[4][2] = 1.0;
    K->K[5][2] = -1.0;
+   
+   return K;
+   }
+
+/* 3D 26 connectivity kernel                              */
+/*            x       y       z       t       v   coeff  */
+/*      -----------------------------------------------  */
+/* [00]    1.00    0.00    0.00    0.00    0.00    1.00  */
+/* [01]   -1.00    0.00    0.00    0.00    0.00    1.00  */
+/* [02]    0.00    1.00    0.00    0.00    0.00    1.00  */
+/* [03]    0.00   -1.00    0.00    0.00    0.00    1.00  */
+/* [04]    0.00    0.00    1.00    0.00    0.00    1.00  */
+/* [05]    0.00    0.00   -1.00    0.00    0.00    1.00  */
+Kernel *get_3D26_kernel(void)
+{
+   Kernel *K = new_kernel(26);
+   
+   K->K[0][0] = 1.0;
+   K->K[1][0] = -1.0;
+   K->K[2][1] = 1.0;
+   K->K[3][1] = -1.0;
+   K->K[4][2] = 1.0;
+   K->K[5][2] = -1.0;
+   
+   return K;
    }
