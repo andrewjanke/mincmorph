@@ -25,6 +25,7 @@
 /*                              - replaced K (Keep) option with Clamp.       */
 /*                              - introduced notion of fore and back colors  */
 
+#include <config.h>
 #include <stdlib.h>
 #include <sys/param.h>
 #include <unistd.h>
@@ -42,6 +43,7 @@
 char    *get_real_from_string(char *string, double *value);
 char    *get_string_from_string(char *string, char **value);
 void     calc_volume_range(Volume * vol, double *min, double *max);
+void     print_version_info(void);
 
 /* typedefs */
 typedef enum {
@@ -90,6 +92,10 @@ char     successive_help[] = "Successive operations (Maximum: 100) \
 
 /* Argument table */
 ArgvInfo argTable[] = {
+   {NULL, ARGV_HELP, (char *)NULL, (char *)NULL,
+    "General options:"},
+   {"-version", ARGV_FUNC, (char *)print_version_info, (char *)NULL,
+    "print version info and exit"},
    {"-verbose", ARGV_CONSTANT, (char *)TRUE, (char *)&verbose,
     "be verbose"},
    {"-clobber", ARGV_CONSTANT, (char *)TRUE, (char *)&clobber,
@@ -600,4 +606,12 @@ void calc_volume_range(Volume * vol, double *min, double *max)
    if(verbose){
       fprintf(stdout, "Found range of [%g:%g]\n", *min, *max);
       }
+   }
+
+void print_version_info(void)
+{
+   fprintf(stdout, "%s version %s\n", PACKAGE, VERSION);
+   fprintf(stdout, "Comments to %s\n", PACKAGE_BUGREPORT);
+   fprintf(stdout, "\n");
+   exit(EXIT_SUCCESS);
    }

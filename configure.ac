@@ -2,9 +2,7 @@
 AC_PREREQ([2.57])
 
 # The arguments are package name, and package version.
-AC_INIT([mincmorph],[1.1])
-
-# The argument is any source file distributed with the package.
+AC_INIT([mincmorph],[1.1],[Andrew Janke <rotor@cmr.uq.edu.au>])
 AC_CONFIG_SRCDIR([mincmorph.c])
 
 AM_INIT_AUTOMAKE
