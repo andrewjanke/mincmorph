@@ -1,5 +1,6 @@
 PROGS = mincmorph
-OBJS = $(PROGS:=.o) kernel_io.o kernel_ops.o
+HEADERS = kernel_io.h kernel_ops.h
+OBJS = $(PROGS:=.o) $(HEADERS:.h=.o)
 
 CC=cc
 
@@ -12,9 +13,9 @@ LDLIBS = -lvolume_io -lminc -lnetcdf -lm
 LDOPTS = $(LDINCLUDES) $(LDLIBS)
 
 
-all: $(PROGS) 
+all: $(PROGS)
 
-.c.o:
+.c.o: $(HEADERS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(PROGS): $(OBJS)

@@ -36,11 +36,13 @@
 #include "kernel_io.h"
 #include "kernel_ops.h"
 
+#define INTERNAL_PREC NC_FLOAT         /* should be NC_FLOAT or NC_DOUBLE */
 #define DEF_DOUBLE -1
 
 /* function prototypes */
 char    *get_real_from_string(char *string, double *value);
 char    *get_string_from_string(char *string, char **value);
+void     calc_volume_range(Volume * vol, double *min, double *max);
 
 /* typedefs */
 typedef enum {
@@ -94,7 +96,10 @@ ArgvInfo argTable[] = {
    {"-clobber", ARGV_CONSTANT, (char *)TRUE, (char *)&clobber,
     "clobber existing files"},
 
-   {NULL, ARGV_HELP, NULL, NULL, "\nOutfile Options (NB: this will affect internal precision)"},
+   {NULL, ARGV_HELP, NULL, NULL,
+    "\nOutfile Options (NB: this effects internal precision, int or short suggested)"},
+   {"-filetype", ARGV_CONSTANT, (char *)NC_UNSPECIFIED, (char *)&dtype,
+    "Use data type of the input file."},
    {"-byte", ARGV_CONSTANT, (char *)NC_BYTE, (char *)&dtype,
     "Write out byte data."},
    {"-short", ARGV_CONSTANT, (char *)NC_SHORT, (char *)&dtype,
@@ -105,7 +110,7 @@ ArgvInfo argTable[] = {
     "Write out single-precision data."},
    {"-double", ARGV_CONSTANT, (char *)NC_DOUBLE, (char *)&dtype,
     "Write out double-precision data."},
-   
+
    {NULL, ARGV_HELP, NULL, NULL, "\nMorphology Options"},
    {"-kernel", ARGV_STRING, (char *)1, (char *)&kernel_fn,
     "<kernel.kern> read in a kernel file"},
@@ -170,6 +175,7 @@ int main(int argc, char *argv[])
    char     ext_txt[256];
    char     tmp_filename[MAXPATHLEN];
    double   tmp_double[4];
+   double   min, max;
    char    *ptr;
 
    char    *axis_order[3] = { MIzspace, MIyspace, MIxspace };
@@ -188,13 +194,13 @@ int main(int argc, char *argv[])
 
    /* check for the infile */
    if(access(infile, F_OK) != 0){
-      fprintf(stderr, "%s: Couldn't find %s\n", argv[0], infile);
+      fprintf(stderr, "%s: Couldn't find %s\n\n", argv[0], infile);
       exit(EXIT_FAILURE);
       }
 
    /* check for the outfile */
-   if(access(outfile, F_OK) != -1 && !clobber){
-      fprintf(stderr, "%s: %s exists! (use -clobber to overwrite)\n", argv[0], outfile);
+   if(access(outfile, F_OK) == 0 && !clobber){
+      fprintf(stderr, "%s: %s exists! (use -clobber to overwrite)\n\n", argv[0], outfile);
       exit(EXIT_FAILURE);
       }
 
@@ -205,13 +211,12 @@ int main(int argc, char *argv[])
       }
    else{
       if(access(kernel_fn, F_OK) != 0){
-         fprintf(stderr, "%s: Couldn't find kernel file: %s\n", argv[0], kernel_fn);
+         fprintf(stderr, "%s: Couldn't find kernel file: %s\n\n", argv[0], kernel_fn);
          exit(EXIT_FAILURE);
          }
 
       if(input_kernel(kernel_fn, kern) != OK){
-         fprintf(stderr, "%s: Died whilst reading in kernel file: %s\n", argv[0],
-                 kernel_fn);
+         fprintf(stderr, "%s: Died reading in kernel file: %s\n\n", argv[0], kernel_fn);
          exit(EXIT_FAILURE);
          }
       if(verbose){
@@ -251,7 +256,7 @@ int main(int argc, char *argv[])
          op->range[1] = (tmp_double[1] == DEF_DOUBLE) ? range[1] : tmp_double[1];
          op->foreground = (tmp_double[2] == DEF_DOUBLE) ? foreground : tmp_double[2];
          op->background = (tmp_double[3] == DEF_DOUBLE) ? background : tmp_double[3];
-         
+
          sprintf(ext_txt, "range: [%g:%g] fg/bg: [%g:%g]", op->range[0],
                  op->range[1], op->foreground, op->background);
          break;
@@ -319,28 +324,25 @@ int main(int argc, char *argv[])
 
       case 'R':
          op->type = READ_KERNEL;
+         op->kern = new_kernel(0);
 
          /* get the filename */
          ptr = get_string_from_string(ptr, &tmp_str);
-
          if(tmp_str == NULL){
-            fprintf(stderr, "%s: R[file.kern] _requires_ a filename\n", argv[0]);
+            fprintf(stderr, "%s: R[file.kern] _requires_ a filename\n\n", argv[0]);
             exit(EXIT_FAILURE);
             }
 
-         op->kern = new_kernel(0);
-
-         /* set up the real filename */
+         /* set up and check for the real filename */
          realpath(tmp_str, tmp_filename);
-         
          if(access(tmp_filename, F_OK) != 0){
-            fprintf(stderr, "%s: Couldn't find kernel file: %s\n", argv[0], tmp_filename);
+            fprintf(stderr, "%s: Couldn't find kernel file: %s\n\n", argv[0],
+                    tmp_filename);
             exit(EXIT_FAILURE);
             }
 
          if(input_kernel(tmp_str, op->kern) != OK){
-            fprintf(stderr, "%s: Died whilst reading in kernel file: %s\n", argv[0],
-                    tmp_str);
+            fprintf(stderr, "%s: Died reading in kernel file: %s\n\n", argv[0], tmp_str);
             exit(EXIT_FAILURE);
             }
 
@@ -354,13 +356,14 @@ int main(int argc, char *argv[])
          ptr = get_string_from_string(ptr, &op->outfile);
 
          if(op->outfile == NULL){
-            fprintf(stderr, "%s: W[file.mnc] _requires_ a filename\n", argv[0]);
+            fprintf(stderr, "%s: W[file.mnc] _requires_ a filename\n\n", argv[0]);
             exit(EXIT_FAILURE);
             }
 
          /* check for the outfile */
-         if(access(op->outfile, F_OK) != -1 && !clobber){
-            fprintf(stderr, "%s: %s exists! (use -clobber to overwrite)\n", argv[0], op->outfile);
+         if(access(op->outfile, F_OK) == 0 && !clobber){
+            fprintf(stderr, "%s: %s exists! (use -clobber to overwrite)\n\n", argv[0],
+                    op->outfile);
             exit(EXIT_FAILURE);
             }
 
@@ -388,8 +391,10 @@ int main(int argc, char *argv[])
 
    /* malloc space for volume structure and read in infile */
    volume = (Volume *) malloc(sizeof(Volume));
-   input_volume(infile, MAX_VAR_DIMS, axis_order, NC_UNSPECIFIED, TRUE, 0.0, 0.0, TRUE,
-                volume, NULL);
+   input_volume(infile, MAX_VAR_DIMS, axis_order,
+                INTERNAL_PREC, TRUE, 0.0, 0.0, TRUE, volume, NULL);
+   get_type_range(get_volume_data_type(*volume), &min, &max);
+   set_volume_real_range(*volume, min, max);
 
    /* do some operations */
    if(verbose){
@@ -400,8 +405,8 @@ int main(int argc, char *argv[])
 
       switch (op->type){
       case BINARISE:
-         volume =
-            binarise(volume, dtype, op->range[0], op->range[1], op->foreground, op->background);
+         volume = binarise(volume, op->range[0], op->range[1],
+                           op->foreground, op->background);
          break;
 
       case CLAMP:
@@ -438,7 +443,7 @@ int main(int argc, char *argv[])
          break;
 
       case HPASS:
-         fprintf(stderr, "GNFARK! Highpass Not implemented yet..\n");
+         fprintf(stderr, "%s: GNFARK! Highpass Not implemented yet..\n\n", argv[0]);
          break;
 
       case CONVOLVE:
@@ -446,11 +451,11 @@ int main(int argc, char *argv[])
          break;
 
       case DISTANCE:
-         volume = distance_kernel(kern, volume, op->background);
+         volume = distance_kernel(kern, volume, background);
          break;
 
       case GROUP:
-         volume = group_kernel(kern, volume, dtype, "tmptmp");
+         volume = group_kernel(kern, volume, background);
          break;
 
       case READ_KERNEL:
@@ -469,18 +474,31 @@ int main(int argc, char *argv[])
             if(verbose){
                fprintf(stdout, "Outputting to %s\n", op->outfile);
                }
+
+            /* set the range to something sensible (if possible) */
+            calc_volume_range(volume, &min, &max);
+            if(dtype == NC_BYTE){
+               if(min >= 0 && max < 255){
+                  fprintf(stdout, "BYTE data, setting 1:1 mapping (0-256)\n");
+                  min = 0;
+                  max = 255;
+                  }
+               }
+            set_volume_real_range(*volume, min, max);
+
             output_modified_volume(op->outfile,
-                                   NC_UNSPECIFIED, FALSE,
+                                   dtype, FALSE,
                                    0.0, 0.0, *volume, infile, arg_string, NULL);
             }
          else{
-            fprintf(stdout, "WRITE passed a NULL pointer! - this is bad\n");
+            fprintf(stdout, "%s: WRITE passed a NULL pointer! - this is bad\n\n",
+                    argv[0]);
             exit(EXIT_FAILURE);
             }
          break;
 
       default:
-         fprintf(stderr, "\nThis is bad\n\n");
+         fprintf(stderr, "\n%s: This is vary bad, call Houston\n\n", argv[0]);
          exit(EXIT_FAILURE);
          }
       }
@@ -505,12 +523,12 @@ char    *get_real_from_string(char *string, double *value)
 
    /* get a double */
    *value = strtod(&string[0], &ptr);
-   
+
    /* if nothing found return a default value */
    if(&string[0] == ptr){
       *value = DEF_DOUBLE;
       }
-   
+
    /* skip over a possible ']' */
    if(ptr[0] == ']'){
       ptr++;
@@ -547,4 +565,40 @@ char    *get_string_from_string(char *string, char **value)
       }
 
    return string;
+   }
+
+void calc_volume_range(Volume * vol, double *min, double *max)
+{
+
+   int      x, y, z;
+   int      sizes[MAX_VAR_DIMS];
+   double   value;
+   progress_struct progress;
+
+   *min = DBL_MAX;
+   *max = -DBL_MIN;
+
+   get_volume_sizes(*vol, sizes);
+
+   initialize_progress_report(&progress, FALSE, sizes[2], "Finding Range");
+   for(z = sizes[0]; z--;){
+      for(y = sizes[1]; y--;){
+         for(x = sizes[2]; x--;){
+
+            value = get_volume_voxel_value(*vol, z, y, x, 0, 0);
+            if(value < *min){
+               *min = value;
+               }
+            else if(value > *max){
+               *max = value;
+               }
+            }
+         }
+      update_progress_report(&progress, z + 1);
+      }
+   terminate_progress_report(&progress);
+
+   if(verbose){
+      fprintf(stdout, "Found range of [%g:%g]\n", *min, *max);
+      }
    }
