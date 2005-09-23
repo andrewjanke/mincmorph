@@ -506,7 +506,7 @@ int main(int argc, char *argv[])
 
          /* read in the kernel or set the kernel to an inbuilt one */
          if(op->kernel_id == K_NULL){
-
+            kernel = new_kernel(0);
             if(input_kernel(op->kernel_fn, kernel) != OK){
                fprintf(stderr, "%s: Died reading in kernel file: %s\n\n", argv[0],
                        op->kernel_fn);
@@ -685,6 +685,10 @@ void calc_volume_range(Volume * vol, double *min, double *max)
       update_progress_report(&progress, z + 1);
       }
    terminate_progress_report(&progress);
+
+   if (*min == *max) {
+       *max = *min + 1.0;
+   }
 
    if(verbose){
       fprintf(stdout, "Found range of [%g:%g]\n", *min, *max);
