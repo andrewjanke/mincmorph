@@ -1,3 +1,7 @@
+
+2006-03-18 Claude Lepage <claude@bic.mni.mcgill.ca>
+   * Tag version to 1.4 for quarantine.
+
 2005-09-23 Bert Vincent <bert@bic.mni.mcgill.ca>
    * Fix reading of kernel files 
    * Force calc_volume_range() to return with a max value strictly 
