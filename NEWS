@@ -1,17 +1,16 @@
 
-        New in Release 1.4
+New in Release 1.5
+* added local cross correlation option
 
+New in Release 1.4
 * Added more inbuilt kernels beyond the original 1
 
-        New in Release 1.3
-
+New in Release 1.3
 * Added epm-header for automagic binary packaging
 * Fixed bug with reading in and mallocing of kernel file names
 
-        New in Release 1.2
-
+New in Release 1.2
 * Added grey-level erosion and dilation support
 
-        New in Release 1.1
-
+New in Release 1.1
 * GNU autoconfigure script.

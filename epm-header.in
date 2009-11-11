@@ -1,10 +1,9 @@
 %product mincmorph
 %copyright 2000-2004 Andrew Janke
 %vendor McConnell Brain Imaging Centre
-%packager Andrew Janke <rotor@cmr.uq.edu.au>
+%packager Andrew L Janke <a.janke@gmail.com>
 %license COPYING
 %readme README
-%description Extra minc package
+%description MINC package for doing morphological operations
 %version @VERSION@
-%requires netcdf
 %requires minc

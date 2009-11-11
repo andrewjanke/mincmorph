@@ -589,7 +589,7 @@ Volume  *group_kernel(Kernel * K, Volume * vol, double bg)
 
                   /* find the minimum possible label for this voxel,    */
                   /* this is done by descending through each neighbours */
-                  /* equivalences untill an equivalence equal to itself */
+                  /* equivalences until an equivalence equal to itself  */
                   /* is found                                           */
                   prev_label = -1;
                   for(c = 0; c < num_matches; c++){
@@ -721,5 +721,77 @@ Volume  *group_kernel(Kernel * K, Volume * vol, double bg)
    free(k1);
    free(k2);
 
+   return (vol);
+   }
+
+/* do local correlation to another volume                    */
+/* xcorr = sum((a*b)^2) / (sqrt(sum(a^2)) * sqrt(sum(b^2))   */
+VIO_Volume *lcorr_kernel(Kernel * K, VIO_Volume * vol, VIO_Volume *cmp)
+{
+   int      x, y, z, c;
+   double   value, v1, v2;
+   double   ssum_v1, ssum_v2, sum_prd, denom;
+   int      sizes[MAX_VAR_DIMS];
+   progress_struct progress;
+   Volume   tmp_vol;
+   
+   if(verbose){
+      fprintf(stdout, "Local Correlation kernel\n");
+      }
+   get_volume_sizes(*vol, sizes);
+   initialize_progress_report(&progress, FALSE, sizes[2], "Local Correlation");
+
+   /* copy the volume */
+   tmp_vol = copy_volume(*vol);
+   
+   /* zero the output volume */
+   for(z = sizes[0]; z--;){
+      for(y = sizes[1]; y--;){
+         for(x = sizes[2]; x--;){
+            set_volume_voxel_value(*vol, z, y, x, 0, 0, 0);
+            }
+         }
+      }
+   
+   /* set output range */
+   set_volume_real_range(*vol, 0.0, 1.0);
+   
+   for(z = -K->pre_pad[2]; z < sizes[0] - K->post_pad[2]; z++){
+      for(y = -K->pre_pad[1]; y < sizes[1] - K->post_pad[1]; y++){
+         for(x = -K->pre_pad[0]; x < sizes[2] - K->post_pad[0]; x++){
+            
+            /* init counters */
+            ssum_v1 = ssum_v2 = sum_prd = 0;
+            for(c = 0; c < K->nelems; c++){
+               v1 = get_volume_real_value(tmp_vol,
+                                          z + K->K[c][2],
+                                          y + K->K[c][1],
+                                          x + K->K[c][0], 0 + K->K[c][3],
+                                          0 + K->K[c][4]) * K->K[c][5];
+               v2 = get_volume_real_value(*cmp,
+                                          z + K->K[c][2],
+                                          y + K->K[c][1],
+                                          x + K->K[c][0], 0 + K->K[c][3],
+                                          0 + K->K[c][4]) * K->K[c][5];
+               
+               /* increment counters */
+               ssum_v1 += v1*v1;
+               ssum_v2 += v2*v2;
+               sum_prd += v1*v2;
+               }
+            
+            denom = sqrt(ssum_v1 * ssum_v2);
+            value = (denom == 0.0) ? 0.0 : sum_prd / denom;
+            
+            set_volume_real_value(*vol, z, y, x, 0, 0, value);
+            }
+         }
+      update_progress_report(&progress, z + 1);
+      }
+   terminate_progress_report(&progress);
+   
+   /* tidy up */
+   delete_volume(tmp_vol);
+   
    return (vol);
    }

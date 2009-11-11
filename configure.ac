@@ -2,7 +2,7 @@
 AC_PREREQ([2.57])
 
 # The arguments are package name, and package version.
-AC_INIT([mincmorph],[1.4],[Andrew Janke <rotor@cmr.uq.edu.au>])
+AC_INIT([mincmorph],[1.5],[Andrew L Janke <a.janke@gmail.com>])
 AC_CONFIG_SRCDIR([mincmorph.c])
 
 AM_INIT_AUTOMAKE
@@ -20,6 +20,9 @@ AC_PROG_INSTALL
 
 # Checks for libraries.  See m4/README.
 mni_REQUIRE_VOLUMEIO
+
+# for clean MINC2.0 volume_io
+AC_DEFINE_UNQUOTED(VIO_PREFIX_NAMES, 1, [Play nice with the other kids volume_io])
 
 # Finish up by writing output files.
 AC_CONFIG_FILES([Makefile])

@@ -1,16 +1,17 @@
-/* mincmorph.c                                                               */
-/*                                                                           */
-/* Andrew Janke - rotor@cmr.uq.edu.au                                        */
-/* Center for Magnetic Resonance                                             */
-/* University of Queensland                                                  */
-/*                                                                           */
-/* Copyright Andrew Janke, The University of Queensland.                     */
-/* Permission to use, copy, modify, and distribute this software and its     */
-/* documentation for any purpose and without fee is hereby granted,          */
-/* provided that the above copyright notice appear in all copies.  The       */
-/* author and the University of Queensland make no representations about the */
-/* suitability of this software for any purpose.  It is provided "as is"     */
-/* without express or implied warranty.                                      */
+/* mincmorph.c
+
+   Copyright 2009
+   Andrew Janke - a.janke@gmail.com
+   Australian National University
+
+   Permission to use, copy, modify, and distribute this software and its
+   documentation for any purpose and without fee is hereby granted,
+   provided that the above copyright notice appear in all copies.  The
+   author and the University make no representations about the
+   suitability of this software for any purpose.  It is provided "as is"
+   without express or implied warranty.
+*/
+
 
 #include <config.h>
 #include <stdlib.h>
@@ -21,10 +22,6 @@
 #include <string.h>
 
 #include <volume_io.h>
-/* someone fix volume_io! */
-#undef X
-#undef Y
-#undef Z
 
 #include <ParseArgv.h>
 #include <time_stamp.h>
@@ -37,7 +34,7 @@
 /* function prototypes */
 char    *get_real_from_string(char *string, double *value);
 char    *get_string_from_string(char *string, char **value);
-void     calc_volume_range(Volume * vol, double *min, double *max);
+void     calc_volume_range(VIO_Volume * vol, double *min, double *max);
 void     print_version_info(void);
 
 /* kernel names for pretty output */
@@ -48,7 +45,7 @@ typedef enum {
    UNDEF = 0,
    BINARISE, CLAMP, PAD, ERODE, DILATE, MDILATE,
    OPEN, CLOSE, LPASS, HPASS, CONVOLVE, DISTANCE,
-   GROUP, READ_KERNEL, WRITE
+   GROUP, READ_KERNEL, WRITE, LCORR
    } op_types;
 
 typedef struct {
@@ -56,6 +53,7 @@ typedef struct {
    char     op_c;
    char    *kernel_fn;
    kern_types kernel_id;
+   char    *cmpfile;
    char    *outfile;
    double   range[2];
    double   foreground;
@@ -89,7 +87,8 @@ char     successive_help[] = "Successive operations (Maximum: 100) \
 \n\tF - distance transform (binary input only - not checked) \
 \n\tG - Label the groups in the volume in ascending order \
 \n\tR[TYPE|file.kern] - (2D04|2D08|3D06|3D26) or read in a kernel file \
-\n\tW[file.mnc]  - write out current results \
+\n\tW[file.mnc] - write out current results \
+\n\tI[cmp.mnc] - local xcorr between current file and cmp.mnc \
 \n\tDefault: ";
 
 /* Argument table */
@@ -189,7 +188,8 @@ int main(int argc, char *argv[])
    char    *infile;
    char    *outfile;
 
-   Volume  *volume;
+   VIO_Volume *volume;
+   VIO_Volume *cmpvol;
    Kernel  *kernel;
    int      num_ops;
    Operation operation[100];
@@ -369,7 +369,7 @@ int main(int argc, char *argv[])
          if(op->kernel_id == K_NULL){
 
             /* set up and check for the real filename */
-            realpath(tmp_str, tmp_filename);
+            (void)realpath(tmp_str, tmp_filename);
             if(access(tmp_filename, F_OK) != 0){
                fprintf(stderr, "%s: Couldn't find kernel file: %s\n\n", argv[0],
                        tmp_filename);
@@ -395,7 +395,7 @@ int main(int argc, char *argv[])
             fprintf(stderr, "%s: W[file.mnc] _requires_ a filename\n\n", argv[0]);
             exit(EXIT_FAILURE);
             }
-
+         
          /* check for the outfile */
          if(access(op->outfile, F_OK) == 0 && !clobber){
             fprintf(stderr, "%s: %s exists! (use -clobber to overwrite)\n\n", argv[0],
@@ -404,6 +404,26 @@ int main(int argc, char *argv[])
             }
 
          sprintf(ext_txt, "filename: %s", op->outfile);
+         break;
+
+      case 'I':
+         op->type = LCORR;
+
+         /* get the filenames */
+         ptr = get_string_from_string(ptr, &op->cmpfile);
+
+         if(op->cmpfile == NULL){
+            fprintf(stderr, "%s: I[cmp.mnc] requires a filename\n\n", argv[0]);
+            exit(EXIT_FAILURE);
+            }
+         
+         /* check for cmpfile */
+         if(access(op->cmpfile, F_OK) != 0){
+            fprintf(stderr, "%s: Couldn't find compare file: %s\n\n", argv[0], op->cmpfile);
+            exit(EXIT_FAILURE);
+            }
+
+         sprintf(ext_txt, "compare filename: %s", op->cmpfile);
          break;
 
       default:
@@ -426,7 +446,7 @@ int main(int argc, char *argv[])
       }
 
    /* malloc space for volume structure and read in infile */
-   volume = (Volume *) malloc(sizeof(Volume));
+   volume = (VIO_Volume *) malloc(sizeof(VIO_Volume));
    input_volume(infile, MAX_VAR_DIMS, axis_order,
                 INTERNAL_PREC, TRUE, 0.0, 0.0, TRUE, volume, NULL);
    get_type_range(get_volume_data_type(*volume), &min, &max);
@@ -574,8 +594,33 @@ int main(int argc, char *argv[])
                                 0.0, 0.0, *volume, infile, arg_string, NULL);
          break;
 
+      case LCORR:
+         if(op->cmpfile == NULL){
+            fprintf(stdout, "%s: LCORR passed a NULL pointer! - this is bad\n\n",
+                    argv[0]);
+            exit(EXIT_FAILURE);
+            }
+
+         if(verbose){
+            fprintf(stdout, "Comparing to %s\n", op->cmpfile);
+            }
+         
+         /* malloc space for volume structure and read cmpfile */
+         cmpvol = (VIO_Volume *) malloc(sizeof(VIO_Volume));
+         input_volume(op->cmpfile, MAX_VAR_DIMS, axis_order,
+            INTERNAL_PREC, TRUE, 0.0, 0.0, TRUE, cmpvol, NULL);
+         
+         /* run the local correlation */
+         volume = lcorr_kernel(kernel, volume, cmpvol);
+         
+         /* clean up */
+         delete_volume(*cmpvol);
+         free(cmpvol);
+         
+         break;
+
       default:
-         fprintf(stderr, "\n%s: This is very bad, call Houston\n\n", argv[0]);
+         fprintf(stderr, "\n%s: Unknown operation (This is very bad, call Houston)\n\n", argv[0]);
          exit(EXIT_FAILURE);
          }
       }
@@ -655,13 +700,13 @@ char    *get_string_from_string(char *string, char **value)
    return string;
    }
 
-void calc_volume_range(Volume * vol, double *min, double *max)
+void calc_volume_range(VIO_Volume * vol, double *min, double *max)
 {
 
    int      x, y, z;
    int      sizes[MAX_VAR_DIMS];
    double   value;
-   progress_struct progress;
+   VIO_progress_struct progress;
 
    *min = DBL_MAX;
    *max = -DBL_MIN;

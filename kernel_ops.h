@@ -7,14 +7,15 @@
 #include "kernel_io.h"
 
 /* kernel functions */
-Volume  *binarise(Volume * vol, double floor, double ceil, double fg, double bg);
-Volume  *clamp(Volume * vol, double floor, double ceil, double bg);
-Volume  *pad(Kernel * K, Volume * vol, double bg);
-Volume  *erosion_kernel(Kernel * K, Volume * vol);
-Volume  *dilation_kernel(Kernel * K, Volume * vol);
-Volume  *median_dilation_kernel(Kernel * K, Volume * vol);
-Volume  *convolve_kernel(Kernel * K, Volume * vol);
-Volume  *distance_kernel(Kernel * K, Volume * vol, double bg);
-Volume  *group_kernel(Kernel * K, Volume * vol, double bg);
+VIO_Volume  *binarise(VIO_Volume * vol, double floor, double ceil, double fg, double bg);
+VIO_Volume  *clamp(VIO_Volume * vol, double floor, double ceil, double bg);
+VIO_Volume  *pad(Kernel * K, VIO_Volume * vol, double bg);
+VIO_Volume  *erosion_kernel(Kernel * K, VIO_Volume * vol);
+VIO_Volume  *dilation_kernel(Kernel * K, VIO_Volume * vol);
+VIO_Volume  *median_dilation_kernel(Kernel * K, VIO_Volume * vol);
+VIO_Volume  *convolve_kernel(Kernel * K, VIO_Volume * vol);
+VIO_Volume  *distance_kernel(Kernel * K, VIO_Volume * vol, double bg);
+VIO_Volume  *group_kernel(Kernel * K, VIO_Volume * vol, double bg);
+VIO_Volume  *lcorr_kernel(Kernel * K, VIO_Volume * vol, VIO_Volume *cmp);
 
 #endif
