@@ -2,7 +2,7 @@
 AC_PREREQ([2.57])
 
 # The arguments are package name, and package version.
-AC_INIT([mincmorph],[1.5],[Andrew L Janke <a.janke@gmail.com>])
+AC_INIT([mincmorph],[1.5.1],[Andrew L Janke <a.janke@gmail.com>])
 AC_CONFIG_SRCDIR([mincmorph.c])
 
 AM_INIT_AUTOMAKE
