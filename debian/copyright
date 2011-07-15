@@ -1,32 +1,23 @@
-This work was packaged for Debian by:
+Format: http://dep.debian.net/deps/dep5/
+Upstream-Name: mincmorph
+Upstream-Contact: Andrew Janke <a.janke@gmail.com>
+Source: http://github.com/andrewjanke/mincmorph
 
-    Andrew Janke <a.janke@gmail.com> on Fri, 15 Jul 2011 03:14:32 +1000
 
-It was downloaded from:
+Files: *
+Copyright: 2009-2011, Andrew Janke, The University of Queensland
+License: Other
+ Permission to use, copy, modify, and distribute this software and its
+ documentation for any purpose and without fee is hereby granted,
+ provided that the above copyright notice appear in all copies.  The
+ author and the University of Queensland make no representations about the
+ suitability of this software for any purpose.  It is provided "as is"
+ without express or implied warranty.
 
-    url://github.com/andrewjanke/mincmorph
 
-Upstream Author(s):
-
-    Andrew Janke <a.janke@gmail.com>
-
-Copyright:
-
-    Copyright (C) 2011 Andrew Janke
-
-License:
-
-    Copyright Andrew Janke, The University of Queensland.
-    Permission to use, copy, modify, and distribute this software and its
-    documentation for any purpose and without fee is hereby granted,
-    provided that the above copyright notice appear in all copies.  The
-    author and the University of Queensland make no representations about the
-    suitability of this software for any purpose.  It is provided "as is"
-    without express or implied warranty.
-
-The Debian packaging is:
-
-    Copyright (C) 2011 Andrew Janke <a.janke@gmail.com>
-
-and is licensed under the GPL version 3,
-see "/usr/share/common-licenses/GPL-3".
+Files: debian/*
+Copyright: 2011, Andrew Janke <a.janke@gmail.com>
+           2011, Michael Hanke <mih@debian.org>
+License: GPL-3
+  On Debian systems, the complete text of the GNU General
+  Public License can be found in `/usr/share/common-licenses/GPL-3'.
