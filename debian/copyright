@@ -1,0 +1,32 @@
+This work was packaged for Debian by:
+
+    Andrew Janke <a.janke@gmail.com> on Fri, 15 Jul 2011 03:14:32 +1000
+
+It was downloaded from:
+
+    url://github.com/andrewjanke/mincmorph
+
+Upstream Author(s):
+
+    Andrew Janke <a.janke@gmail.com>
+
+Copyright:
+
+    Copyright (C) 2011 Andrew Janke
+
+License:
+
+    Copyright Andrew Janke, The University of Queensland.
+    Permission to use, copy, modify, and distribute this software and its
+    documentation for any purpose and without fee is hereby granted,
+    provided that the above copyright notice appear in all copies.  The
+    author and the University of Queensland make no representations about the
+    suitability of this software for any purpose.  It is provided "as is"
+    without express or implied warranty.
+
+The Debian packaging is:
+
+    Copyright (C) 2011 Andrew Janke <a.janke@gmail.com>
+
+and is licensed under the GPL version 3,
+see "/usr/share/common-licenses/GPL-3".

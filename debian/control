@@ -1,0 +1,24 @@
+Source: mincmorph
+Section: science
+Priority: extra
+Maintainer: Andrew Janke <a.janke@gmail.com>
+Build-Depends: debhelper (>= 7.0.50~), autotools-dev
+Standards-Version: 3.8.4
+Homepage: https://github.com/andrewjanke/mincmorph
+
+Package: mincmorph
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libminc2-1 (>=2.1.00)
+Description: mincmorph performs morphology operations on MINC files
+ mincmorph - morphological operations 101
+ .
+ Much of the theory behind what this does can be found at these web sites..
+ http://www.mmorph.com/faq.htm
+ http://www.dai.ed.ac.uk/HIPR2/skeleton.htm
+ SNF - http://www.umiacs.umd.edu/research/EXPAR/papers/3449/node7.html#SECTION00041000000000000000
+ CC8 - http://www.dai.ed.ac.uk/CVonline/LOCAL_COPIES/OWENS/LECT3/node2.html
+     - http://www.dai.ed.ac.uk/HIPR2/label.htm
+ .
+ HOW TO USE IT:
+       mincmorph -help      for more information
+
