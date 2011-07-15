@@ -10,16 +10,8 @@ Homepage: https://github.com/andrewjanke/mincmorph
 Package: mincmorph
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: mincmorph performs morphology operations on MINC files
- mincmorph - morphological operations 101
- .
- Much of the theory behind what this does can be found at these web sites..
- http://www.mmorph.com/faq.htm
- http://www.dai.ed.ac.uk/HIPR2/skeleton.htm
- SNF - http://www.umiacs.umd.edu/research/EXPAR/papers/3449/node7.html#SECTION00041000000000000000
- CC8 - http://www.dai.ed.ac.uk/CVonline/LOCAL_COPIES/OWENS/LECT3/node2.html
-     - http://www.dai.ed.ac.uk/HIPR2/label.htm
- .
- HOW TO USE IT:
-       mincmorph -help      for more information
-
+Description: perform morphology operations on MINC files
+ This package provides a command line tool to perform morphological operations,
+ on volumetric images. Such operations include, for example, frequency
+ filtering, erosion/dilation, and convolution with various kernels. The only
+ supported data format for input and output is MINC.
