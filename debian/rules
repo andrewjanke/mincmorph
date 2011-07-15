@@ -1,5 +1,17 @@
 #!/usr/bin/make -f
 # -*- makefile -*-
+
+srcpkg = $(shell LC_ALL=C dpkg-parsechangelog | grep '^Source:' | cut -d ' ' -f 2,2)
+debver = $(shell LC_ALL=C dpkg-parsechangelog | grep '^Version:' | cut -d ' ' -f 2,2 )
+upstreamver = $(shell echo $(debver) | cut -d '-' -f 1,1 )
+
+# this figures out the last merge point from 'master' into the Debian branch and
+# then described this commit relative to the last release tag (mincmorph-...)
+# If this should make any sense the local master branch must track upstream's
+# master or whatever other source branch.
+gitver = $(shell [ -x /usr/bin/git ] && git describe --tags --match 'mincmorph-*' $$(git merge-base -a HEAD master) | sed -e 's/^mincmorph-//' -e 's/-/./' -e 's/-/+git/')
+
+
 export CFLAGS=-I/usr/include/mpi
 
 %:
@@ -7,3 +19,8 @@ export CFLAGS=-I/usr/include/mpi
 
 override_dh_auto_configure:
 	dh_auto_configure -- --with-minc2
+
+get-orig-source:
+	# orig tarball, turn directory into something nicer
+	git archive --format=tar --prefix=$(srcpkg)-$(gitver)/ HEAD | \
+		gzip -9 > $(srcpkg)_$(gitver).orig.tar.gz
