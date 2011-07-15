@@ -2,13 +2,14 @@ Source: mincmorph
 Section: science
 Priority: extra
 Maintainer: Andrew Janke <a.janke@gmail.com>
-Build-Depends: debhelper (>= 7.0.50~), autotools-dev
-Standards-Version: 3.8.4
+Uploaders: Michael Hanke <mih@debian.org>
+Build-Depends: debhelper (>= 7.0.50~), autotools-dev, libminc-dev (>=2.1~)
+Standards-Version: 3.9.2
 Homepage: https://github.com/andrewjanke/mincmorph
 
 Package: mincmorph
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, libminc2-1 (>=2.1.00)
+Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: mincmorph performs morphology operations on MINC files
  mincmorph - morphological operations 101
  .
