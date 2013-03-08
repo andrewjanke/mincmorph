@@ -44,8 +44,8 @@ char    *KERN_names[] = { "NULL", "2D04", "2D08", "3D06", "3D26" };
 typedef enum {
    UNDEF = 0,
    BINARISE, CLAMP, PAD, ERODE, DILATE, MDILATE,
-   OPEN, CLOSE, LPASS, HPASS, CONVOLVE, DISTANCE,
-   GROUP, READ_KERNEL, WRITE, LCORR
+   MFILTER, OPEN, CLOSE, LPASS, HPASS, CONVOLVE, 
+   DISTANCE, GROUP, READ_KERNEL, WRITE, LCORR
    } op_types;
 
 typedef struct {
@@ -79,6 +79,7 @@ char     successive_help[] = "Successive operations (Maximum: 100) \
 \n\tE - erosion \
 \n\tD - dilation \
 \n\tM - median dilation \
+\n\tN - median filter \
 \n\tO - open \
 \n\tC - close \
 \n\tL - lowpass filter \
@@ -157,7 +158,9 @@ ArgvInfo argTable[] = {
    {"-dilation", ARGV_CONSTANT, (char *)"D", (char *)&succ_txt,
     "do a single dilation"},
    {"-median_dilation", ARGV_CONSTANT, (char *)"M", (char *)&succ_txt,
-    "do a single median dilation (note: this is not a median filter!)"},
+    "do a single median dilation"},
+   {"-median_filter", ARGV_CONSTANT, (char *)"N", (char *)&succ_txt,
+    "do a single median filter"},
    {"-open", ARGV_CONSTANT, (char *)"O", (char *)&succ_txt,
     "open:            dilation(erosion(X))"},
    {"-close", ARGV_CONSTANT, (char *)"C", (char *)&succ_txt,
@@ -316,6 +319,10 @@ int main(int argc, char *argv[])
 
       case 'M':
          op->type = MDILATE;
+         break;
+
+      case 'N':
+         op->type = MFILTER;
          break;
 
       case 'O':
@@ -485,6 +492,10 @@ int main(int argc, char *argv[])
 
       case MDILATE:
          volume = median_dilation_kernel(kernel, volume);
+         break;
+
+      case MFILTER:
+         volume = median_filter_kernel(kernel, volume);
          break;
 
       case OPEN:
