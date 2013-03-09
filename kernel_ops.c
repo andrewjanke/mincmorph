@@ -29,6 +29,15 @@ int compare_groups(const void *a, const void *b)
    return (*(Group_info *) b)->count - (*(Group_info *) a)->count;
    }
 
+int compare_reals(const void* a, const void* b)
+{
+   return (*(Real *)a - *(Real *)b);
+}
+int compare_unsigned_ints(const void* a, const void* b)
+{
+   return (*(unsigned int *)a - *(unsigned int *)b);
+}
+
 void split_kernel(Kernel * K, Kernel * k1, Kernel * k2)
 {
    int      c, k1c, k2c;
@@ -295,7 +304,7 @@ Volume  *erosion_kernel(Kernel * K, Volume * vol)
 
    if(verbose){
       fprintf(stdout, "Erosion kernel\n");
-      }
+   }
    get_volume_sizes(*vol, sizes);
    initialize_progress_report(&progress, FALSE, sizes[2], "Erosion");
 
@@ -331,7 +340,7 @@ Volume  *erosion_kernel(Kernel * K, Volume * vol)
    delete_volume(tmp_vol);
    terminate_progress_report(&progress);
    return (vol);
-   }
+}
 
 /* convolve a volume with a input kernel */
 Volume  *convolve_kernel(Kernel * K, Volume * vol)
@@ -374,6 +383,58 @@ Volume  *convolve_kernel(Kernel * K, Volume * vol)
    terminate_progress_report(&progress);
    return (vol);
    }
+
+Volume  *median_filter_kernel(Kernel * K, Volume * vol)
+{
+   int x, y, z, c;
+   int    sizes[MAX_VAR_DIMS];
+   Volume   tmp_vol;
+   progress_struct progress;
+   Real value;
+   Real neighbours[K->nelems];
+
+   if(verbose){
+      fprintf(stdout, "Median filter kernel\n");
+   }
+   get_volume_sizes(*vol, sizes);
+   initialize_progress_report(&progress, FALSE, sizes[2], "Median Filter");
+
+   /* copy the volume */
+   tmp_vol = copy_volume(*vol);
+
+   for(z = -K->pre_pad[2]; z < sizes[0] - K->post_pad[2]; z++){
+      for(y = -K->pre_pad[1]; y < sizes[1] - K->post_pad[1]; y++){
+         for(x = -K->pre_pad[0]; x < sizes[2] - K->post_pad[0]; x++){
+
+            for(c = 0; c < K->nelems; c++){
+               neighbours[c] = get_volume_voxel_value(tmp_vol,
+                                              z + K->K[c][2],
+                                              y + K->K[c][1],
+                                              x + K->K[c][0], 0 + K->K[c][3],
+                                              0 + K->K[c][4]);
+            }
+            /* find median of our little array */
+            qsort(neighbours, K->nelems, sizeof(Real), &compare_reals);
+            if ( K->nelems % 2 == 1 ){
+               value = neighbours[K->nelems / 2];
+            }
+            else{
+               c = K->nelems / 2;
+               value = (neighbours[c] + neighbours[c-1]) / 2;
+            }
+            
+            /* store the median value */
+            set_volume_voxel_value(*vol, z, y, x, 0, 0, value);
+         }
+      }
+
+      update_progress_report(&progress, z + 1);
+   }
+
+   delete_volume(tmp_vol);
+   terminate_progress_report(&progress);
+   return (vol);
+}
 
 /* should really only work on binary images    */
 /* from the original 2 pass Borgefors alg      */

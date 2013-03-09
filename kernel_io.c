@@ -2,7 +2,7 @@
 
 #include <volume_io.h>
 #include "kernel_io.h"
-#define MAX_KERNEL_ELEMS 1000
+#define MAX_KERNEL_ELEMS 10000
 
 extern int verbose;
 
